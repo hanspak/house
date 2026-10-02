@@ -1,7 +1,8 @@
-"""KB 주간시계열 엑셀로 '서울 아파트 국면판' HTML을 만든다.
+"""KB 주간시계열 엑셀로 '아파트 국면판' HTML을 만든다.
 
 사용법:
   python3 scripts/kb_dashboard.py                      # kbdata/ 안의 가장 최근 *_주간시계열.xlsx 사용
+  python3 scripts/kb_dashboard.py --drive              # 구글 드라이브 폴더의 최신 파일을 받아서 사용
   python3 scripts/kb_dashboard.py kbdata/20260921_주간시계열.xlsx
 
 결과: dashboard/kb_dashboard_YYYYMMDD.html (기준일), dashboard/latest.html
@@ -43,7 +44,10 @@ def build(xlsx):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if "--drive" in sys.argv[1:]:
+        from kb_drive import fetch_latest
+        src = fetch_latest()
+    elif len(sys.argv) > 1:
         src = sys.argv[1]
     else:
         files = sorted(glob.glob(os.path.join(ROOT, "kbdata", "*_주간시계열.xlsx")))

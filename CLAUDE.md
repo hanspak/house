@@ -16,8 +16,11 @@ house/
 ├─ kbdata/                       # KB 주간시계열 원본 (YYYYMMDD_주간시계열.xlsx, 아파트만)
 ├─ scripts/
 │  ├─ kb_extract.py              # 엑셀 → JSON 추출
-│  ├─ kb_dashboard.py            # 국면판 HTML 생성 (인자 없으면 kbdata/ 최신 파일)
+│  ├─ kb_dashboard.py            # 국면판 HTML 생성 (인자 없으면 kbdata/ 최신 파일, --drive면 드라이브에서 받음)
+│  ├─ kb_drive.py                # 구글 드라이브 폴더에서 최신 주간시계열 내려받기 (서비스 계정)
 │  └─ dashboard_template.html    # 국면판 화면 템플릿
+├─ docs/google-drive-setup.md    # 드라이브 연동 설정 방법
+├─ secrets/                      # 서비스 계정 키·폴더 id (Git 제외, 절대 커밋 금지)
 └─ dashboard/                    # 생성된 국면판 (kb_dashboard_기준일.html, latest.html)
 ```
 

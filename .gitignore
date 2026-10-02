@@ -6,3 +6,6 @@ kbdata/*.xlsx
 
 # 생성물: python3 scripts/kb_dashboard.py 로 다시 만들 수 있음
 dashboard/
+
+# 구글 드라이브 서비스 계정 키·설정 (절대 커밋 금지)
+secrets/
