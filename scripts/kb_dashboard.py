@@ -1,4 +1,4 @@
-"""KB 주간시계열 엑셀로 '아파트 국면판' HTML을 만든다.
+"""KB 주간시계열 엑셀로 '아파트 국면판'(국면·흐름·심리·역사 비교) HTML을 만든다.
 
 사용법:
   python3 scripts/kb_dashboard.py                      # kbdata/ 안의 가장 최근 *_주간시계열.xlsx 사용
@@ -26,7 +26,6 @@ def build(xlsx):
         extract(xlsx, js)
         with open(js, encoding="utf-8") as f:
             data = json.load(f)
-    data.pop("sentiment", None)  # 이 화면에서는 쓰지 않음
     tpl = open(os.path.join(ROOT, "scripts", "dashboard_template.html"), encoding="utf-8").read()
     html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
