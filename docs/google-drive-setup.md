@@ -75,3 +75,20 @@ python3 scripts/kb_dashboard.py --drive              # 최신 파일 받기 + �
 | 'YYYYMMDD_주간시계열' 이름의 엑셀이 없습니다 | 폴더를 서비스 계정과 공유하지 않았거나, 파일 이름 형식이 다름 |
 | `HttpError 403 ... Drive API has not been used` | 2단계 Drive API를 켜지 않음 |
 | `HttpError 404 File not found` | 폴더 id가 틀렸거나 공유가 안 됨 |
+
+## GitHub Actions로 자동 게시 (GitHub Pages)
+
+`.github/workflows/dashboard.yml`이 매일 09:00(한국 시간)에 드라이브의 최신 파일로 국면판을 만들어 `https://hanspak.github.io/house/`에 올립니다. 드라이브에 새 파일을 올린 뒤 바로 보고 싶으면 **Actions → 국면판 갱신 → Run workflow**를 누릅니다.
+
+### 처음 한 번 설정
+
+1. **Secrets 등록**: 저장소 **Settings → Secrets and variables → Actions → New repository secret**
+   - `KB_SA_KEY_JSON`: `secrets/kb-drive-sa.json` 파일 내용 전체 (`{`부터 `}`까지)
+   - `KB_DRIVE_FOLDER_ID`: 드라이브 폴더 id
+2. **Pages 켜기**: 저장소 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 선택
+
+### 주의
+
+- 무료 GitHub Pages 주소는 누구나 볼 수 있습니다. 화면에는 KB 공개 통계만 들어 있고, 키와 폴더 id는 들어가지 않습니다.
+- 키는 GitHub Secrets에만 저장되고, 실행 로그에는 `***`로 가려집니다. 실행이 끝나면 작업 공간의 키 파일도 지웁니다.
+- 실행이 실패하면 Actions 탭에서 빨간 표시를 눌러 로그를 보면 됩니다. 메시지별 원인은 위의 "문제 해결" 표와 같습니다.
