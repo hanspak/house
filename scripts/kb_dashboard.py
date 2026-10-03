@@ -16,6 +16,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(__file__))
 from kb_extract import main as extract  # noqa: E402
+from kb_status import update_status  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -38,6 +39,7 @@ def build(xlsx):
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
     shutil.copyfile(out, os.path.join(out_dir, "latest.html"))
+    update_status(weekly=data["asof"])
     print(f"생성: {out}")
     return out
 

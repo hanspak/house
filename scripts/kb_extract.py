@@ -111,6 +111,23 @@ def read_sentiment(path, sheet, label):
             "values": {k: [None if pd.isna(v) else round(float(v), 2) for v in df[k]] for k in df.columns}}
 
 
+def check(idx, views, sale):
+    """추출 결과 점검. KB가 시트 구조를 바꿨을 때 엉뚱한 화면이 게시되지 않도록 빌드를 멈춘다."""
+    problems = []
+    if len(sale) < 140:
+        problems.append(f"지역 수가 {len(sale)}개뿐 (140개 이상이어야 함)")
+    if len(views) < 15:
+        problems.append(f"시·도 화면이 {len(views)}개뿐")
+    # 추석·설 주는 KB가 조사를 건너뛰어 14일 간격이 생길 수 있다
+    gaps = [b for a, b in zip(idx[-104:], idx[-103:]) if (b - a).days not in (7, 14)]
+    if gaps:
+        problems.append(f"최근 2년 중 주 간격이 7·14일이 아닌 곳: {[g.strftime('%Y-%m-%d') for g in gaps[:3]]}")
+    if not any(x is not None for x in sale.get("서울특별시", [])[-4:]):
+        problems.append("서울 최근 4주 값이 비어 있음")
+    if problems:
+        raise SystemExit("주간 자료 점검 실패:\n - " + "\n - ".join(problems))
+
+
 def main(path, out):
     names, idx, sale_cols = read_sheet(path, "3.매매지수")
     jnames, jidx, jeonse_cols = read_sheet(path, "4.전세지수")
@@ -142,6 +159,7 @@ def main(path, out):
                      "groups": {k: ("수도권" if k in CAPITAL else "지방") for k in nation_kids},
                      "groupNames": ["수도권", "지방"]})
 
+    check(idx, views, sale)
     data = {
         "source": path.split("/")[-1],
         "asof": last.strftime("%Y-%m-%d"),

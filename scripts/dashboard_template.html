@@ -127,9 +127,15 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 .tile:focus-visible rect{stroke:var(--accent);stroke-width:2.5}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:6px 9px;border-radius:6px;z-index:9;max-width:280px;font-variant-numeric:tabular-nums}
 .note{font-size:12.5px;color:var(--ink-3);max-width:96ch;margin-top:18px}
+.site{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;font-size:13px}
+.site a{padding:4px 12px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2);text-decoration:none;font-weight:500}
+.site a:hover{border-color:var(--ink-3)}
+.site a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.site a[aria-current]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 </style>
 
 <div class="wrap">
+<nav class="site" aria-label="대시보드 이동"><a href="index.html" aria-current="page">주간 아파트 국면판</a><a href="monthly.html">월간 주택 시장판</a></nav>
 <header>
   <div>
     <div class="eyebrow">KB부동산 주간 아파트 시계열 · <span id="src"></span> · <span id="asof"></span> 기준</div>

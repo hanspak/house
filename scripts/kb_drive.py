@@ -1,4 +1,4 @@
-"""구글 드라이브 폴더에서 최신 KB 주간시계열 엑셀을 kbdata/로 내려받는다.
+"""구글 드라이브 폴더에서 최신 KB 시계열 엑셀(주간·월간 주택·월간 오피스텔)을 kbdata/로 내려받는다.
 
 서비스 계정으로 Drive API(읽기 전용)를 쓴다. 설정 방법은 docs/google-drive-setup.md 참고.
 
@@ -7,8 +7,9 @@
   KB_SA_KEY           서비스 계정 키 JSON 경로 (기본 secrets/kb-drive-sa.json)
 
 사용법:
-  python3 scripts/kb_drive.py            # 최신 파일 1개 내려받기 (이미 있으면 건너뜀)
-  python3 scripts/kb_drive.py --list     # 폴더의 주간시계열 파일 목록만 보기
+  python3 scripts/kb_drive.py                    # 최신 주간 파일 받기 (이미 있으면 건너뜀)
+  python3 scripts/kb_drive.py --kind monthly     # 최신 월간 주택 파일 (officetel: 월간 오피스텔)
+  python3 scripts/kb_drive.py --list             # 폴더의 KB 파일 목록만 보기
 """
 import argparse
 import io
@@ -25,7 +26,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 GSHEET = "application/vnd.google-apps.spreadsheet"
-NAME_RE = re.compile(r"(\d{8})_주간시계열")
+# 종류: (파일 이름 패턴, 내려받을 때 쓸 이름). 이름 안 공백은 있어도 없어도 인식한다.
+KINDS = {
+    "weekly": (re.compile(r"(\d{8})_주간\s*시계열"), "{asof}_주간시계열.xlsx"),
+    "monthly": (re.compile(r"(\d{6})_월간\s*주택\s*시계열"), "{asof}_월간 주택 시계열.xlsx"),
+    "officetel": (re.compile(r"(\d{6})_월간\s*오피스텔\s*시계열"), "{asof}_월간 오피스텔 시계열.xlsx"),
+}
+LABELS = {"weekly": "주간", "monthly": "월간 주택", "officetel": "월간 오피스텔"}
 
 
 def config():
@@ -53,8 +60,8 @@ def service(key):
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def list_files(svc, folder):
-    """폴더 안의 'YYYYMMDD_주간시계열' 엑셀/구글시트를 기준일 내림차순으로."""
+def list_files(svc, folder, kind="weekly"):
+    """폴더 안의 해당 종류 KB 엑셀/구글시트를 기준일 내림차순으로."""
     q = f"'{folder}' in parents and trashed = false and (mimeType = '{XLSX}' or mimeType = '{GSHEET}')"
     files, token = [], None
     while True:
@@ -68,9 +75,9 @@ def list_files(svc, folder):
     out = []
     for f in files:
         # Mac에서 올린 파일은 한글 이름이 자모 분리형(NFD)이라 정규화 후 비교한다.
-        m = NAME_RE.search(unicodedata.normalize("NFC", f["name"]))
+        m = KINDS[kind][0].search(unicodedata.normalize("NFC", f["name"]))
         if m:
-            f["asof"] = m.group(1)
+            f["asof"], f["kind"] = m.group(1), kind
             out.append(f)
     return sorted(out, key=lambda f: (f["asof"], f["modifiedTime"]), reverse=True)
 
@@ -78,7 +85,7 @@ def list_files(svc, folder):
 def download(svc, f, dest_dir):
     from googleapiclient.http import MediaIoBaseDownload
 
-    name = f"{f['asof']}_주간시계열.xlsx"
+    name = KINDS[f["kind"]][1].format(asof=f["asof"])
     dest = os.path.join(dest_dir, name)
     # 같은 이름·같은 크기면 다시 받지 않는다 (구글시트는 크기 정보가 없어 항상 받음).
     if os.path.exists(dest) and f.get("size") and os.path.getsize(dest) == int(f["size"]):
@@ -99,13 +106,17 @@ def download(svc, f, dest_dir):
     return dest
 
 
-def fetch_latest():
-    """최신 파일을 kbdata/에 받아 그 경로를 돌려준다."""
+def fetch_latest(kind="weekly", required=True):
+    """해당 종류의 최신 파일을 kbdata/에 받아 그 경로를 돌려준다. required=False면 없을 때 None."""
     folder, key = config()
     svc = service(key)
-    files = list_files(svc, folder)
+    files = list_files(svc, folder, kind)
     if not files:
-        sys.exit("드라이브 폴더에 'YYYYMMDD_주간시계열' 이름의 엑셀이 없습니다. 폴더를 서비스 계정과 공유했는지도 확인하세요.")
+        if not required:
+            print(f"드라이브에 {LABELS[kind]} 파일이 없어 건너뜀")
+            return None
+        example = KINDS[kind][1].format(asof="20260921" if kind == "weekly" else "202609")
+        sys.exit(f"드라이브 폴더에 {LABELS[kind]} 엑셀이 없습니다(예: {example}). 폴더를 서비스 계정과 공유했는지도 확인하세요.")
     dest_dir = os.path.join(ROOT, "kbdata")
     os.makedirs(dest_dir, exist_ok=True)
     return download(svc, files[0], dest_dir)
@@ -114,11 +125,14 @@ def fetch_latest():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--list", action="store_true", help="파일 목록만 보기")
+    ap.add_argument("--kind", choices=list(KINDS), default="weekly", help="받을 파일 종류")
     args = ap.parse_args()
     if args.list:
         folder, key = config()
-        for f in list_files(service(key), folder):
-            size = f"{int(f['size']) / 1e6:.1f}MB" if f.get("size") else "구글시트"
-            print(f"{f['asof']}  {f['name']}  {size}  수정 {f['modifiedTime'][:10]}")
+        svc = service(key)
+        for kind in KINDS:
+            for f in list_files(svc, folder, kind):
+                size = f"{int(f['size']) / 1e6:.1f}MB" if f.get("size") else "구글시트"
+                print(f"{LABELS[kind]:7s} {f['asof']}  {unicodedata.normalize('NFC', f['name'])}  {size}  수정 {f['modifiedTime'][:10]}")
     else:
-        fetch_latest()
+        fetch_latest(args.kind)

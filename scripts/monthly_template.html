@@ -1,0 +1,442 @@
+<title>월간 주택 시장판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#fcfcfb; --ink:#14171c; --ink-2:#4b5059; --ink-3:#7c818b;
+  --line:#dfe2e7; --grid:#eceef1; --chip:#e9ecf1;
+  --up:#d03b3b; --up-2:#e98a82; --mid:#f0efec; --down-2:#86b6ef; --down:#256abf; --accent:#1c5cab;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#008300; --c7:#4a3aa7; --c8:#e34948;
+  --sans:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121417; --surface:#1a1c1f; --ink:#f3f4f6; --ink-2:#c3c6cc; --ink-3:#8d929b;
+    --line:#2e3238; --grid:#25282d; --chip:#262a30;
+    --up:#e66767; --up-2:#8a3b3b; --mid:#383835; --down-2:#2f5687; --down:#5598e7; --accent:#86b6ef;
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300; --c7:#9085e9; --c8:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121417; --surface:#1a1c1f; --ink:#f3f4f6; --ink-2:#c3c6cc; --ink-3:#8d929b;
+  --line:#2e3238; --grid:#25282d; --chip:#262a30;
+  --up:#e66767; --up-2:#8a3b3b; --mid:#383835; --down-2:#2f5687; --down:#5598e7; --accent:#86b6ef;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300; --c7:#9085e9; --c8:#e66767;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:32px 110px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:16px;margin-bottom:16px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--ink-3)}
+h1{font-size:28px;line-height:1.25;margin:4px 0 0;font-weight:700}
+.lede{color:var(--ink-2);max-width:76ch;margin:6px 0 0;font-size:14px}
+.kpis{display:flex;flex-wrap:wrap;gap:22px}
+.kpi .k{font-size:12px;color:var(--ink-3)}
+.kpi .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:6}
+.ctl{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;font-size:13px;padding:5px 11px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+select{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px 18px;min-width:0;scroll-margin-top:80px}
+.panel.wide{grid-column:1/-1}
+.panel.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ph{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:2px}
+.ph h2{font-size:17px;margin:0;line-height:1.3}
+.ph h2 .no{font-family:var(--mono);font-size:13px;color:var(--accent);margin-right:6px;font-weight:500}
+.ph .src{font-size:11.5px;color:var(--ink-3);font-weight:400;margin-left:6px}
+.sub{font-size:12.5px;color:var(--ink-3);margin:2px 0 10px}
+.q{font-size:13px;color:var(--ink-2);margin:0 0 10px}
+.finding{font-size:13.5px;background:var(--chip);border-radius:8px;padding:9px 12px;margin:10px 0 0}
+.finding b{font-weight:600}
+svg{display:block;max-width:100%;height:auto;font-family:var(--sans)}
+svg text{fill:var(--ink-2);font-size:11px}
+svg .muted{fill:var(--ink-3)}
+svg .strong{fill:var(--ink);font-weight:600}
+svg .sel{fill:var(--ink);font-weight:700;font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2);margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.legend .dash{width:16px;height:0;border-top:1.5px dashed var(--ink-3);border-radius:0;vertical-align:3px}
+.ramp{display:inline-flex;height:10px;border-radius:2px;overflow:hidden;margin:0 6px;vertical-align:-1px}
+.ramp b{width:16px}
+.empty{font-size:13px;color:var(--ink-3);padding:36px 0;text-align:center}
+.up{color:var(--up)} .down{color:var(--down)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.state{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--chip);color:var(--ink-2)}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:8px 0 12px;font-size:12px}
+@media (max-width:560px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.stats div{border:1px solid var(--line);border-radius:7px;padding:5px 8px}
+.stats dt{color:var(--ink-3);font-size:11px}
+.stats dd{margin:0;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
+.sm{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media (max-width:900px){.sm{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:520px){.sm{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sm button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:6px 8px 4px;display:block;min-width:0}
+.sm button:hover{border-color:var(--ink-3)}
+.sm button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sm button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sm .n{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:4px}
+.sm .n span{font-family:var(--mono);font-weight:500;font-size:11.5px}
+.sm .m{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.tbl{overflow-x:auto;max-height:460px;overflow-y:auto}
+table{border-collapse:collapse;font-size:13px;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--ink-2);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th:focus-visible{outline:2px solid var(--accent)}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-weight:600}
+.gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:520px){.gauges{grid-template-columns:1fr}}
+.gauge{border:1px solid var(--line);border-radius:8px;padding:9px 11px 5px}
+.gauge .k{font-size:12.5px;color:var(--ink-2);display:flex;justify-content:space-between;gap:6px;align-items:center}
+.gauge .v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1.2;font-variant-numeric:tabular-nums}
+.gauge .d{font-size:11.5px;color:var(--ink-3)}
+.pill{font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.pill.hot{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.pill.cool{background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
+.pill.norm{background:var(--chip);color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chips button{all:unset;cursor:pointer;font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2)}
+.chips button[aria-pressed="true"]{color:var(--ink);font-weight:600;border-color:currentColor}
+.chips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chips i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.tile{cursor:pointer}
+.tile:focus-visible rect{stroke:var(--accent);stroke-width:2.5}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:6px 9px;border-radius:6px;z-index:9;max-width:280px;font-variant-numeric:tabular-nums}
+.note{font-size:12.5px;color:var(--ink-3);max-width:96ch;margin-top:18px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;margin:0 0 14px}
+.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.toc a:hover,.toc a:focus-visible{text-decoration:underline}
+.group{margin:0 0 26px;scroll-margin-top:70px}
+.group>h2{font-size:19px;margin:0 0 2px}
+.group>.gsub{font-size:13px;color:var(--ink-3);margin:0 0 12px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.facts{grid-template-columns:1fr}}
+.fact{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.fact .k{font-size:12px;color:var(--ink-3)}
+.fact .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.3}
+.fact .d{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.site{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;font-size:13px}
+.site a{padding:4px 12px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2);text-decoration:none;font-weight:500}
+.site a:hover{border-color:var(--ink-3)}
+.site a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.site a[aria-current]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+</style>
+<div class="wrap">
+<nav class="site" aria-label="대시보드 이동"><a href="index.html">주간 아파트 국면판</a><a href="monthly.html" aria-current="page">월간 주택 시장판</a></nav>
+<header>
+  <div>
+    <div class="eyebrow">KB부동산 월간 주택 시계열 · <span id="src"></span> · <span id="asof"></span> 기준</div>
+    <h1><span id="h-name"></span> 월간 주택 시장판</h1>
+    <p class="lede">주간 국면판에 없는 월간 자료로 만든 화면입니다. 주택 유형(아파트·단독·연립), 실제 가격(만원), 전세가율, 가격 양극화, 구매 부담, 3개월 뒤 전망, 월세, 오피스텔을 다룹니다. 위에서 지역과 매매/전세를 바꾸면 모든 화면이 함께 바뀝니다.</p>
+  </div>
+  <div class="kpis" id="kpis"></div>
+</header>
+<div class="controls" role="toolbar" aria-label="보기 설정">
+  <div class="ctl"><label for="f-region">지역</label><select id="f-region"></select></div>
+  <div class="ctl">가격 <div class="seg" id="f-mode"><button data-v="sale">매매</button><button data-v="jeonse">전세</button></div></div>
+  <div class="ctl">기간 <div class="seg" id="f-range"><button data-v="5y">5년</button><button data-v="2008">2008~</button><button data-v="all">전체</button></div></div>
+</div>
+<nav class="toc" aria-label="구역 이동" id="toc"></nav>
+<div id="panels"></div>
+<p class="note">출처: KB부동산 월간 주택 시계열(<span id="src2"></span>). 지수 기준 2026-01 = 100. KB는 2022년 11월 표본을 크게 늘렸습니다(아파트 약 6만 2천 개 면적, 단독 3천, 연립 2천5백). 그래서 평균·중위 가격, 전세가율, 5분위 가격은 2022-10 → 11월 사이에 계단처럼 바뀌어 있으며, KB는 시장 흐름은 지수 변동률로 보라고 안내합니다. HAI는 2019년부터 개편된 가계동향조사 소득을 씁니다. 국면·해석 문구는 이 화면이 정한 참고용입니다.</p>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const D = /*DATA*/;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function txt(p,x,y,s,a={}){const t=el("text",{x,y,...a},p);t.textContent=s;return t;}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ok=v=>v!=null&&isFinite(v);
+const fmt=(v,d=2)=>ok(v)?(v>0?"+":"")+v.toFixed(d):"–";
+const pct=(v,d=2)=>ok(v)?fmt(v,d)+"%":"–";
+const cls=v=>ok(v)?(v>0?"up":v<0?"down":""):"";
+const tip=$("#tip");
+function showTip(e,h){tip.innerHTML=h;tip.hidden=false;const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+"px";tip.style.top=y+"px";}
+const hideTip=()=>tip.hidden=true;
+function nice(lo,hi,n){if(hi-lo<1e-6){lo-=1;hi+=1;}const raw=(hi-lo)/n,p=10**Math.floor(Math.log10(raw)),st=[1,2,2.5,5,10].map(m=>m*p).find(m=>m>=raw);return [Math.floor(lo/st)*st,Math.ceil(hi/st)*st,st];}
+const pad=(lo,hi)=>{const d=(hi-lo)*0.05||1;return [lo-d,hi+d];};
+let SER=[];const loadSer=()=>SER=Array.from({length:8},(_,i)=>css("--c"+(i+1)));
+function mix(a,b,t){const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));const A=p(a),B=p(b);return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("");}
+function div(v,lim){const t=Math.max(-1,Math.min(1,v/lim)),mid=css("--mid");if(t>=0)return t<.5?mix(mid,css("--up-2"),t*2):mix(css("--up-2"),css("--up"),(t-.5)*2);const u=-t;return u<.5?mix(mid,css("--down-2"),u*2):mix(css("--down-2"),css("--down"),(u-.5)*2);}
+
+// ---------- generic line chart ----------
+function lineChart(box,{n,series,w=560,h=220,m={l:40,r:16,t:10,b:24},yfmt=v=>+v.toFixed(1),xlab,refs=[],hover,lo:LO,hi:HI}){
+  const all=series.flatMap(s=>s.v.filter(ok)).concat(refs.map(r=>r.y));
+  const [lo,hi,st]=nice(LO??Math.min(...all),HI??Math.max(...all),5);
+  const X=i=>m.l+i/Math.max(1,n-1)*(w-m.l-m.r),Y=v=>h-m.b-(v-lo)/(hi-lo)*(h-m.t-m.b);
+  const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img"},box);
+  for(let v=lo;v<=hi+1e-9;v+=st){el("line",{x1:m.l,x2:w-m.r,y1:Y(v),y2:Y(v),stroke:css("--grid")},svg);txt(svg,m.l-6,Y(v)+4,yfmt(v),{"text-anchor":"end",class:"muted"});}
+  xlab&&xlab(svg,X,h,m,w);
+  refs.forEach(r=>el("line",{x1:m.l,x2:w-m.r,y1:Y(r.y),y2:Y(r.y),stroke:css("--ink-3"),"stroke-dasharray":r.dash||"4 3"},svg));
+  series.forEach(s=>{const d=s.v.map((v,i)=>!ok(v)?"":(i&&ok(s.v[i-1])?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join("");
+    el("path",{d,fill:"none",stroke:s.c,"stroke-width":s.wd||2,"stroke-linejoin":"round",opacity:s.op||1},svg);
+    if(s.end){let i=s.v.length-1;while(i>=0&&!ok(s.v[i]))i--;if(i>=0){el("circle",{cx:X(i),cy:Y(s.v[i]),r:4,fill:s.c,stroke:css("--surface"),"stroke-width":2},svg);s.label&&txt(svg,X(i)+8,(s.ly??Y(s.v[i]))+4,s.label,{class:"strong"});}}});
+  if(hover){const cross=el("line",{y1:m.t,y2:h-m.b,stroke:css("--ink-3"),visibility:"hidden"},svg);
+    const hit=el("rect",{x:m.l,y:0,width:w-m.l-m.r,height:h,fill:"transparent"},svg);
+    hit.addEventListener("mousemove",e=>{const b=svg.getBoundingClientRect();let i=Math.round(((e.clientX-b.left)/b.width*w-m.l)/(w-m.l-m.r)*(n-1));i=Math.max(0,Math.min(n-1,i));
+      const h_=hover(i);if(!h_)return;cross.setAttribute("x1",X(i));cross.setAttribute("x2",X(i));cross.setAttribute("visibility","visible");showTip(e,h_);});
+    hit.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip();});}
+  return {svg,X,Y,lo,hi};
+}
+const yearLabels=(dates,every=0)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=every||Math.ceil((y1-y0+1)/7);
+  for(let y=y0;y<=y1;y++){if((y-y0)%e)continue;const i=dates.findIndex(d=>d>=y+"-01");if(i>0&&X(i)<w-m.r-12)txt(svg,X(i),h-6,y,{"text-anchor":"middle",class:"muted"});}};
+function scatterAxes(svg,{X,Y,x0,x1,xs,y0,y1,ys,m,w,h,xfmt=v=>(v>0?"+":"")+(+v.toFixed(1))+"%",yfmt=v=>(+v.toFixed(2))+"%"}){
+  for(let x=x0;x<=x1+1e-9;x+=xs){el("line",{x1:X(x),x2:X(x),y1:m.t,y2:h-m.b,stroke:Math.abs(x)<1e-9?css("--ink-3"):css("--grid")},svg);txt(svg,X(x),h-m.b+15,xfmt(x),{"text-anchor":"middle",class:"muted"});}
+  for(let y=y0;y<=y1+1e-9;y+=ys){el("line",{x1:m.l,x2:w-m.r,y1:Y(y),y2:Y(y),stroke:Math.abs(y)<1e-9?css("--ink-3"):css("--grid")},svg);txt(svg,m.l-7,Y(y)+4,yfmt(y),{"text-anchor":"end",class:"muted"});}}
+function placeLabels(svg,pts,{X,Y,m,w,want,cls_}){const placed=[];
+  for(const p of want){const cx=X(p),cy=Y(p),name=short(p.k),lw=name.length*11+4;
+    const cands=[[cx+10,cy+4,"start"],[cx-10,cy+4,"end"],[cx-lw/2,cy-10,"start"],[cx-lw/2,cy+18,"start"]];
+    const bx=c=>c[2]==="start"?[c[0],c[1]-10,c[0]+lw,c[1]+2]:[c[0]-lw,c[1]-10,c[0],c[1]+2];
+    const clash=b=>placed.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])||pts.some(o=>o!==p&&X(o)>b[0]-6&&X(o)<b[2]+6&&Y(o)>b[1]-6&&Y(o)<b[3]+6)||b[0]<m.l||b[2]>w-m.r;
+    const c=cands.find(c=>!clash(bx(c)))||(p.force?cands[0]:null);if(c){placed.push(bx(c));txt(svg,c[0],c[1],name,{"text-anchor":c[2],class:cls_?.(p)||""});}}}
+function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fill:"transparent",tabindex:0,role:"button","aria-label":label},svg);h.style.cursor="pointer";
+  h.addEventListener("mousemove",e=>showTip(e,html));h.addEventListener("mouseleave",hideTip);
+  if(onclick){h.addEventListener("click",onclick);h.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onclick();}});}}
+
+// ---------- data ----------
+const MODE={sale:"매매",jeonse:"전세"};
+const TYPES=[["all","종합"],["apt","아파트"],["detached","단독"],["row","연립(빌라)"]];
+const PROVS=["서울특별시","부산광역시","대구광역시","인천광역시","광주광역시","대전광역시","울산광역시","세종특별자치시","경기도","강원특별자치도","충청북도","충청남도","전북특별자치도","전라남도","경상북도","경상남도","제주특별자치도"];
+const REGIONS=["전국","수도권",...PROVS];
+const SH=k=>k.replace(/특별자치시|특별자치도|광역시|특별시/,"").replace(/^충청북도$/,"충북").replace(/^충청남도$/,"충남").replace(/^경상북도$/,"경북").replace(/^경상남도$/,"경남").replace(/^전라남도$/,"전남").replace(/^강원$/,"강원");
+const short=k=>k.includes("|")?k.split("|")[1]:k;
+const VIEWS=Object.fromEntries(D.views.map(v=>[v.id,v]));
+const state={region:"서울특별시",mode:"sale",range:"2008"};
+try{Object.assign(state,JSON.parse(localStorage.getItem("kb-monthly")||"{}"));}catch(e){}
+const save=()=>{try{localStorage.setItem("kb-monthly",JSON.stringify(state));}catch(e){}};
+const M=()=>MODE[state.mode];
+const ser=(obj,k)=>obj&&obj.values[k]?obj.values[k]:null;
+const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
+const chgN=(a,n)=>{if(!a)return NaN;const [v,i]=lastOk(a);return i-n>=0&&ok(a[i-n])?(v/a[i-n]-1)*100:NaN;};
+const won=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
+function rangeStart(dates){return state.range==="all"?0:Math.max(0,dates.findIndex(d=>d>=(state.range==="2008"?"2008-01":String(+D.asof.slice(0,4)-5)+D.asof.slice(4))));}
+const monthLabels=(dates)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=Math.max(1,Math.ceil((y1-y0+1)/7));
+  for(let y=y0;y<=y1;y++){if((y-y0)%e)continue;const i=dates.findIndex(d=>d>=y+"-01");if(i>0&&X(i)<w-m.r-12)txt(svg,X(i),h-6,y,{"text-anchor":"middle",class:"muted"});}};
+function reformLine(r,dates,m,h){const i=dates.indexOf("2022-11");if(i<0)return;el("line",{x1:r.X(i),x2:r.X(i),y1:m.t,y2:h-m.b,stroke:css("--ink-3"),"stroke-dasharray":"1 3"},r.svg);txt(r.svg,r.X(i)+3,m.t+10,"표본 개편",{class:"muted","font-size":10});}
+function endLabels(r,items,n){const lab=items.filter(l=>ok(l.v)).map(l=>({...l,y:r.Y(l.v)})).sort((a,b)=>a.y-b.y);for(let i=1;i<lab.length;i++)if(lab[i].y-lab[i-1].y<13)lab[i].y=lab[i-1].y+13;lab.forEach(l=>txt(r.svg,r.X(n-1)+8,l.y+4,l.t,{class:"strong"}));}
+function hbars(box,items,{fmt:f=v=>v.toFixed(1),hl,w=560,unit=""}){ // items: [{k,label,v}]
+  const rows=items.filter(i=>ok(i.v)),bh=18,gap=5,m={l:70,r:70,t:4,b:4},h=m.t+rows.length*(bh+gap)+m.b,max=Math.max(...rows.map(r=>r.v),0),min=Math.min(...rows.map(r=>r.v),0);
+  const X=v=>m.l+(v-min)/((max-min)||1)*(w-m.l-m.r),svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img"},box);
+  rows.forEach((r,i)=>{const y=m.t+i*(bh+gap),on=r.k===hl,x0=X(Math.min(0,r.v)),x1=X(Math.max(0,r.v));
+    txt(svg,m.l-8,y+bh/2+4,r.label,{"text-anchor":"end",class:on?"sel":""});
+    el("rect",{x:x0,y,width:Math.max(1,x1-x0),height:bh,rx:3,fill:on?css("--c2"):css("--c1"),opacity:on?1:.8},svg);
+    txt(svg,x1+6,y+bh/2+4,f(r.v)+unit,{class:on?"sel":"strong"});
+    const hit=el("rect",{x:m.l,y,width:w-m.l-m.r,height:bh,fill:"transparent"},svg);hit.style.cursor=r.onclick?"pointer":"default";
+    hit.addEventListener("mousemove",e=>showTip(e,`<b>${r.label}</b><br>${f(r.v)}${unit}${r.extra?"<br>"+r.extra:""}`));hit.addEventListener("mouseleave",hideTip);if(r.onclick)hit.addEventListener("click",r.onclick);});
+  if(min<0)el("line",{x1:X(0),x2:X(0),y1:0,y2:h,stroke:css("--ink-3")},svg);
+}
+const goRegion=k=>()=>{if(REGIONS.includes(k)){state.region=k;render();}};
+
+// ---------- panels ----------
+const P=[];const def=(id,title,q,wide,fn)=>P.push({id,title,q,wide,fn});
+
+def(1,"이달 요약","",true,(box)=>{
+  const r=state.region,ix=D.index,f=[];
+  const apt=ser(ix[state.mode+"_apt"],r),row=ser(ix[state.mode+"_row"],r);
+  f.push([`아파트 ${M()} 전월 대비`,pct(chgN(apt,1)),cls(chgN(apt,1)),`전년 같은 달 대비 ${pct(chgN(apt,12))}`]);
+  f.push([`연립(빌라) ${M()} 전년 대비`,pct(chgN(row,12)),cls(chgN(row,12)),`전월 대비 ${pct(chgN(row,1))}`]);
+  const med=ser(D[state.mode==="sale"?"median_sale":"median_jeonse"],r);const mv=med?lastOk(med.apt)[0]:null;
+  f.push([`중위 아파트 ${M()}가격`,won(mv),"",med?`1년 전 ${won(med.apt[med.apt.length-13])}`:"이 지역 자료 없음"]);
+  const jr=ser(D.jeonse_ratio,r),[jv]=lastOk(jr);f.push(["아파트 전세가율",ok(jv)?jv.toFixed(1)+"%":"–","",jr?`1년 전 ${ok(jr[jr.length-13])?jr[jr.length-13].toFixed(1)+"%":"–"} · 매매가 대비 전세가`:"자료 없음"]);
+  const ol=ser(D[state.mode==="sale"?"outlook_sale":"outlook_jeonse"],r),[ov]=lastOk(ol);f.push([`3개월 뒤 ${M()} 전망지수`,ok(ov)?ov.toFixed(1):"–",ok(ov)?(ov>100?"up":"down"):"",ok(ov)?(ov>100?"100 초과 = 상승 응답이 많음":"100 미만 = 하락 응답이 많음"):"자료 없음"]);
+  const h=ser(D.hai,r),[hv,hi]=lastOk(h?h.apt:null);f.push(["아파트 구매력지수(HAI)",ok(hv)?hv.toFixed(1):"–","",ok(hv)?`${D.hai.dates[hi]} 값 · 100 미만이면 중위소득 가구에 부담`:"이 지역 자료 없음"]);
+  box.innerHTML=`<p class="sub">${D.asof} 기준 · ${short(r)}</p><div class="facts">${f.map(([k,v,c,d])=>`<div class="fact"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="d">${d}</div></div>`).join("")}</div>`;
+});
+
+def(2,"주택 유형별 흐름","아파트·단독·연립(빌라) 중 무엇이 더 올랐나",false,(box)=>{
+  const r=state.region,ix=D.index,dates=ix.sale_apt.dates,i0=rangeStart(dates),dd=dates.slice(i0);
+  const series=TYPES.map(([t,n],j)=>({v:(ser(ix[state.mode+"_"+t],r)||[]).slice(i0),c:SER[j],end:true,n}));
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(r)} ${M()}가격지수 · 2026-01 = 100 (모든 유형이 같은 기준이라 선끼리 흐름 비교 가능)`;box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);
+  const m={l:40,r:96,t:10,b:24},h=250,res=lineChart(d_,{n:dd.length,series,w:560,h,m,xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
+  endLabels(res,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${ok(lastOk(s.v)[0])?lastOk(s.v)[0].toFixed(1):"–"}`})),dd.length);
+  const tb=document.createElement("div");tb.className="tbl";tb.style.marginTop="10px";
+  tb.innerHTML=`<table><thead><tr><th>유형</th><th>전월 대비</th><th>3개월</th><th>전년 대비</th><th>3년</th></tr></thead><tbody>${TYPES.map(([t,n])=>{const a=ser(ix[state.mode+"_"+t],r);return `<tr><td>${n}</td>${[1,3,12,36].map(k=>`<td class="${cls(chgN(a,k))}">${pct(chgN(a,k),k>=12?1:2)}</td>`).join("")}</tr>`;}).join("")}</tbody></table>`;box.appendChild(tb);
+});
+
+def(3,"시·도별 중위 가격","지역마다 중간 가격의 집은 얼마인가 (만원 → 억)",false,(box)=>{
+  const src=D[state.mode==="sale"?"median_sale":"median_jeonse"],type=state.ptype||"apt";
+  box.innerHTML=`<div class="card-head"><p class="sub" style="margin:0">${M()} 중위가격 · ${D.asof} · 막대를 누르면 그 지역으로 전환</p><div class="seg" id="f-ptype">${TYPES.map(([t,n])=>`<button data-v="${t}" aria-pressed="${t===type}">${n.replace("(빌라)","")}</button>`).join("")}</div></div><div style="margin-top:8px"></div>`;
+  box.querySelectorAll("#f-ptype button").forEach(b=>b.onclick=()=>{state.ptype=b.dataset.v;render();});
+  const items=["전국",...PROVS].map(k=>{const s=src.values[k];const v=s&&s[type]?lastOk(s[type])[0]:null;return {k,label:SH(k),v,onclick:goRegion(k),extra:s&&s[type]?`1년 전 ${won(s[type][s[type].length-13])}`:""};}).filter(x=>ok(x.v)).sort((a,b)=>b.v-a.v);
+  hbars(box.lastElementChild,items,{fmt:v=>won(v),hl:state.region,w:520});
+});
+
+def(4,"선택 지역 평균·중위 가격 추이","실제 가격 수준이 어떻게 변해 왔나",false,(box)=>{
+  const r=state.region,kind=state.mode==="sale"?"sale":"jeonse",mean=D["mean_"+kind],med=D["median_"+kind];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(r)} 아파트·연립 ${M()} 평균(실선)과 중위(옅은 선) · 억 원`;box.appendChild(sub);
+  if(!mean.values[r])return box.insertAdjacentHTML("beforeend",'<div class="empty">이 지역은 가격 자료가 없습니다</div>');
+  const dates=mean.dates,i0=rangeStart(dates),dd=dates.slice(i0),mi=med.dates.indexOf(dd[0]);
+  const al=(arr,src)=>{if(!arr)return dd.map(()=>null);const off=src.dates.indexOf(dd[0]);return dd.map((d,j)=>{const k=src.dates.indexOf(d);return k>=0&&ok(arr[k])?arr[k]/10000:null;});};
+  const series=[{v:al(mean.values[r].apt,mean),c:SER[0],end:true,n:"아파트 평균"},{v:al(med.values[r]?.apt,med),c:SER[0],op:.45,wd:1.5,n:"아파트 중위"},{v:al(mean.values[r].row,mean),c:SER[2],end:true,n:"연립 평균"},{v:al(med.values[r]?.row,med),c:SER[2],op:.45,wd:1.5,n:"연립 중위"}];
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:92,t:12,b:24},h=250;
+  const res=lineChart(d_,{n:dd.length,series,w:560,h,m,yfmt:v=>v.toFixed(1),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(2)+"억":"–"}`).join("<br>")});
+  reformLine(res,dd,m,h);
+  endLabels(res,[series[0],series[2]].map(s=>({v:lastOk(s.v)[0],t:`${s.n.replace(" 평균","")} ${ok(lastOk(s.v)[0])?lastOk(s.v)[0].toFixed(2)+"억":"–"}`})),dd.length);
+  const lg=document.createElement("div");lg.className="legend";lg.innerHTML=`<span><i style="background:${SER[0]}"></i>아파트</span><span><i style="background:${SER[2]}"></i>연립(빌라)</span><span>실선 = 평균 · 옅은 선 = 중위 · 점선 = 2022-11 표본 개편</span>`;box.appendChild(lg);
+});
+
+def(5,"아파트 전세가율","매매가 대비 전세가가 몇 %인가 — 높을수록 갭이 작고, 깡통전세 위험도 커짐",true,(box)=>{
+  const r=state.region,jr=D.jeonse_ratio,v=VIEWS[r];
+  box.innerHTML=`<div class="grid" style="gap:14px"><div><p class="sub">${short(r)} 아파트 전세가율 추이 (%)</p><div id="jr-line"></div></div><div><p class="sub" id="jr-bsub"></p><div id="jr-bars"></div></div></div>`;
+  const a=jr.values[r];if(!a){$("#jr-line").innerHTML='<div class="empty">자료 없음</div>';}
+  else{const dates=jr.dates,i0=rangeStart(dates),dd=dates.slice(i0),nat=(jr.values["전국"]||[]).slice(i0);
+    const series=[{v:a.slice(i0),c:SER[0],end:true},...(r!=="전국"?[{v:nat,c:css("--ink-3"),wd:1.3,op:.7}]:[])];
+    const m={l:36,r:60,t:12,b:24},h=230,res=lineChart($("#jr-line"),{n:dd.length,series,w:520,h,m,yfmt:v=>v.toFixed(0)+"%",xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>${short(r)} ${ok(a[i0+i])?a[i0+i].toFixed(1)+"%":"–"}${r!=="전국"?`<br>전국 ${ok(nat[i])?nat[i].toFixed(1)+"%":"–"}`:""}`});
+    reformLine(res,dd,m,h);endLabels(res,[{v:lastOk(a)[0],t:lastOk(a)[0].toFixed(1)+"%"},...(r!=="전국"?[{v:lastOk(nat)[0],t:"전국 "+lastOk(nat)[0].toFixed(1)+"%"}]:[])],dd.length);}
+  const keys=v?v.children:(r==="전국"||r==="수도권"?PROVS:null);
+  $("#jr-bsub").textContent=keys?`${v?short(r)+" 하위 지역":"시·도"}별 현재 전세가율 · 높은 순`:"하위 지역 자료가 없습니다";
+  if(keys){const items=keys.map(k=>{const s=jr.values[k];if(!s)return null;const [x,i]=lastOk(s);return {k,label:short(k).replace(/특별자치시|특별자치도|광역시|특별시/,""),v:x,extra:`1년 전 ${ok(s[i-12])?s[i-12].toFixed(1)+"%":"–"}`,onclick:v?null:goRegion(k)};}).filter(x=>x&&ok(x.v)).sort((a,b)=>b.v-a.v);
+    hbars($("#jr-bars"),items,{fmt:x=>x.toFixed(1),unit:"%",w:520});}
+});
+
+def(6,"가격 양극화 (5분위)","비싼 집과 싼 집의 가격 차이가 벌어지고 있나",false,(box)=>{
+  const r=state.region,q=D[state.mode==="sale"?"quintile_sale":"quintile_jeonse"],s=q.values[r];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(r)} 아파트 ${M()} 가격 5분위 평균 (억) · 5분위 = 상위 20%`;box.appendChild(sub);
+  if(!s)return box.insertAdjacentHTML("beforeend",'<div class="empty">이 지역은 5분위 자료가 없습니다 (전국·서울·수도권·광역시 등만 제공)</div>');
+  const dates=q.dates,i0=rangeStart(dates),dd=dates.slice(i0),ks=["1분위","2분위","3분위","4분위","5분위"];
+  const series=ks.map((k,j)=>({v:(s[k]||[]).slice(i0).map(x=>ok(x)?x/10000:null),c:mix(css("--c1"),css("--ink"),0)||SER[0],op:.35+j*.16,wd:1.6,end:true,n:k}));
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:76,t:12,b:24},h=220;
+  const res=lineChart(d_,{n:dd.length,series,w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+series.map(x=>`${x.n} ${ok(x.v[i])?x.v[i].toFixed(2)+"억":"–"}`).join("<br>")});
+  reformLine(res,dd,m,h);endLabels(res,series.map(x=>({v:lastOk(x.v)[0],t:`${x.n} ${ok(lastOk(x.v)[0])?lastOk(x.v)[0].toFixed(1)+"억":""}`})),dd.length);
+  const bk=Object.keys(s).find(k=>k.includes("배율"));if(bk){const b=s[bk].slice(i0);const d2=document.createElement("div");box.appendChild(d2);
+    const sb=document.createElement("p");sb.className="sub";sb.style.margin="10px 0 4px";sb.textContent="5분위 배율 (상위 20% 평균 ÷ 하위 20% 평균) · 높을수록 양극화";box.insertBefore(sb,d2);
+    const m2={l:40,r:60,t:8,b:22},r2=lineChart(d2,{n:dd.length,series:[{v:b,c:SER[1],end:true}],w:560,h:130,m:m2,yfmt:v=>v.toFixed(1),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>5분위 배율 ${ok(b[i])?b[i].toFixed(2)+"배":"–"}`});
+    reformLine(r2,dd,m2,130);endLabels(r2,[{v:lastOk(b)[0],t:lastOk(b)[0].toFixed(2)+"배"}],dd.length);}
+});
+
+def(7,"주택구매력지수 (HAI)","중위소득 가구가 중위가격 주택을 대출 끼고 살 여력이 있나",false,(box)=>{
+  const h=D.hai,keys=Object.keys(h.values),r=keys.includes(state.region)?state.region:null;
+  const sub=document.createElement("p");sub.className="sub";sub.textContent="아파트 HAI · 100 = 소득의 적정 비율로 상환 가능 · 100 미만일수록 부담이 큼 · 회색 = 다른 지역";box.appendChild(sub);
+  const dates=h.dates,i0=rangeStart(dates),dd=dates.slice(i0);
+  const series=keys.filter(k=>k!==r).map(k=>({v:(h.values[k].apt||[]).slice(i0),c:css("--ink-3"),wd:1,op:.35}));
+  if(r)series.push({v:h.values[r].apt.slice(i0),c:SER[0],wd:2.4,end:true});
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:36,r:60,t:12,b:24},hh=240;
+  const res=lineChart(d_,{n:dd.length,series,w:560,h:hh,m,refs:[{y:100,dash:"2 2"}],yfmt:v=>v.toFixed(0),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+keys.map(k=>{const v=h.values[k].apt[i0+i];return ok(v)?`${SH(k)} ${v.toFixed(1)}`:null;}).filter(Boolean).slice(0,10).join("<br>")});
+  if(r){const [v]=lastOk(h.values[r].apt);endLabels(res,[{v,t:`${SH(r)} ${v.toFixed(1)}`}],dd.length);}
+  const f=document.createElement("p");f.className="finding";f.innerHTML=r?`HAI가 있는 지역: ${keys.map(SH).join(", ")}.`:`<b>${short(state.region)}</b>은 HAI 자료가 없어 회색으로 다른 지역만 보여줍니다. 자료 지역: ${keys.map(SH).join(", ")}.`;box.appendChild(f);
+});
+
+def(8,"3개월 뒤 가격 전망지수","중개업소는 3개월 뒤 가격이 오를 거라 보나",false,(box)=>{
+  const o=D[state.mode==="sale"?"outlook_sale":"outlook_jeonse"],r=state.region,a=o.values[r];
+  box.innerHTML=`<p class="sub">${M()} 전망지수 · 100 초과 = 상승 응답이 많음 · 0~200</p><div id="ol-line"></div><p class="sub" style="margin:12px 0 4px">시·도별 이번 달 전망지수</p><div id="ol-bars"></div>`;
+  if(a){const dates=o.dates,i0=rangeStart(dates),dd=dates.slice(i0),m={l:36,r:52,t:10,b:24},h=200;
+    const res=lineChart($("#ol-line"),{n:dd.length,series:[{v:a.slice(i0),c:SER[0],end:true}],w:560,h,m,refs:[{y:100,dash:"2 2"}],yfmt:v=>v.toFixed(0),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>${short(r)} ${ok(a[i0+i])?a[i0+i].toFixed(1):"–"}`});
+    endLabels(res,[{v:lastOk(a)[0],t:lastOk(a)[0].toFixed(1)}],dd.length);}else $("#ol-line").innerHTML='<div class="empty">자료 없음</div>';
+  const items=["전국",...PROVS].map(k=>({k,label:SH(k),v:o.values[k]?lastOk(o.values[k])[0]:null,onclick:goRegion(k)})).filter(x=>ok(x.v)).sort((a,b)=>b.v-a.v);
+  hbars($("#ol-bars"),items,{fmt:v=>v.toFixed(1),hl:r,w:560});
+});
+
+def(9,"연립(빌라) 시장","시·도별 빌라 가격이 1년 동안 얼마나 움직였나",false,(box)=>{
+  const ix=D.index[state.mode+"_row"],med=D[state.mode==="sale"?"median_sale":"median_jeonse"];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`연립주택 ${M()}지수 전년 같은 달 대비 % · 막대에 마우스를 올리면 중위가격`;box.appendChild(sub);
+  const items=["전국",...PROVS].map(k=>{const a=ix.values[k];const v=chgN(a,12);const mv=med.values[k]?.row?lastOk(med.values[k].row)[0]:null;return {k,label:SH(k),v,extra:`중위 ${M()}가 ${won(mv)} · 전월 대비 ${pct(chgN(a,1))}`,onclick:goRegion(k)};}).filter(x=>ok(x.v)).sort((a,b)=>b.v-a.v);
+  const d_=document.createElement("div");box.appendChild(d_);hbars(d_,items,{fmt:v=>fmt(v,1),unit:"%",hl:state.region,w:560});
+  const f=document.createElement("p");f.className="finding";f.textContent="연립 지수는 시·도 단위까지만 있습니다(구별 값은 KB가 0으로 비워 둠). 공시가격 1억 이하 같은 소액 빌라를 찾을 때 지역을 고르는 참고로 쓸 수 있습니다.";box.appendChild(f);
+});
+
+def(10,"월세지수와 전월세전환율","월세는 얼마나 올랐고, 전세를 월세로 바꾸면 연 몇 %인가 (수도권)",false,(box)=>{
+  const rent=D.rent,conv=D.conversion,keys=Object.keys(rent.values);
+  const sub=document.createElement("p");sub.className="sub";sub.textContent="KB 아파트 월세지수 (2026-01 = 100, 중형 이하) · 수도권 6개 권역만 제공";box.appendChild(sub);
+  const dd=rent.dates,series=keys.map((k,j)=>({v:rent.values[k],c:SER[j],end:true,n:k}));
+  const d1=document.createElement("div");box.appendChild(d1);const m={l:36,r:96,t:10,b:24};
+  const r1=lineChart(d1,{n:dd.length,series,w:560,h:200,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
+  endLabels(r1,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n.replace("특별시","").replace("광역시","")} ${lastOk(s.v)[0]?.toFixed(1)}`})),dd.length);
+  const sb=document.createElement("p");sb.className="sub";sb.style.margin="12px 0 4px";sb.textContent="전월세전환율 (%) · 전세보증금을 월세로 바꿀 때의 연 환산 이율";box.appendChild(sb);
+  const d2=document.createElement("div");box.appendChild(d2);const cd=conv.dates,cs=Object.keys(conv.values).map((k,j)=>({v:conv.values[k],c:SER[j],end:true,n:k}));
+  const r2=lineChart(d2,{n:cd.length,series:cs,w:560,h:180,m,yfmt:v=>v.toFixed(1)+"%",xlab:monthLabels(cd),hover:i=>`<b>${cd[i]}</b><br>`+cs.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(2)+"%":"–"}`).join("<br>")});
+  reformLine(r2,cd,m,180);endLabels(r2,cs.map(s=>({v:lastOk(s.v)[0],t:`${s.n.replace("특별시","").replace("광역시","")} ${lastOk(s.v)[0]?.toFixed(2)}%`})),cd.length);
+  const lg=document.createElement("div");lg.className="legend";lg.innerHTML=keys.map((k,j)=>`<span><i style="background:${SER[j]}"></i>${k}</span>`).join("");box.appendChild(lg);
+});
+
+def(11,"KB 선도아파트 50","시가총액 상위 50개 단지가 전체 시장보다 앞서가나",false,(box)=>{
+  const L=D.leading50,dd=L.dates,i0=rangeStart(dd),d=dd.slice(i0),lv=L.values["지수"].slice(i0);
+  const ix=D.index.sale_apt,al=k=>{const a=ix.values[k];return d.map(x=>{const j=ix.dates.indexOf(x);return j>=0?a[j]:null;});};
+  const series=[{v:lv,c:SER[1],end:true,wd:2.4,n:"선도 50"},{v:al("서울특별시"),c:SER[0],end:true,n:"서울 아파트"},{v:al("전국"),c:css("--ink-3"),end:true,n:"전국 아파트"}];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent="매매지수 · 2026-01 = 100 · 선도 50은 매년 12월 시가총액 상위 50개 단지";box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:36,r:100,t:10,b:24};
+  const res=lineChart(d_,{n:d.length,series,w:560,h:240,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
+  endLabels(res,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${lastOk(s.v)[0]?.toFixed(1)}`})),d.length);
+  const f=document.createElement("p");f.className="finding";f.innerHTML=`전년 같은 달 대비: 선도 50 <b>${pct(chgN(L.values["지수"],12),1)}</b> · 서울 아파트 <b>${pct(chgN(ix.values["서울특별시"],12),1)}</b> · 전국 아파트 <b>${pct(chgN(ix.values["전국"],12),1)}</b>`;box.appendChild(f);
+});
+
+
+// ---------- 오피스텔 ----------
+const OT=D.officetel||null;
+const OT_MAP={"서울특별시":"서울특별시","인천광역시":"인천광역시","경기도":"경기도","수도권":"수도권","전국":"전국","부산광역시":"5개광역시","대구광역시":"5개광역시","광주광역시":"5개광역시","대전광역시":"5개광역시","울산광역시":"5개광역시"};
+const otRegion=()=>OT_MAP[state.region]||"전국";
+const otLast=(key,r)=>{const a=OT&&OT[key].values[r];return a?lastOk(a)[0]:null;};
+const noOT='<div class="empty">오피스텔 자료가 없습니다 (드라이브에 "YYYYMM_월간 오피스텔 시계열.xlsx"를 올리면 나타남)</div>';
+def(12,"오피스텔 권역 비교","권역마다 오피스텔 가격·전세가율·임대수익률은 어떤가",true,(box)=>{
+  if(!OT)return box.innerHTML=noOT;
+  const regs=Object.keys(OT.index.values),hl=otRegion();
+  const rows=regs.map(r=>{const ix=OT.index.values[r],y=OT.yield.values[r],[yv,yi]=lastOk(y);
+    return {r,m1:chgN(ix,1),m12:chgN(ix,12),ms:otLast("mean_sale",r),mj:otLast("mean_jeonse",r),ratio:otLast("ratio",r),yv,y12:ok(y[yi-12])?y[yi-12]:null};});
+  box.innerHTML=`<p class="sub">${OT.asof} 기준 · ${OT.source} · 선택한 지역에 해당하는 권역을 굵게 표시 (${hl})</p><div class="tbl"><table><thead><tr><th>권역</th><th>매매지수 전월</th><th>매매지수 전년</th><th>평균 매매가</th><th>평균 전세가</th><th>전세가율</th><th>임대수익률</th><th>1년 전 수익률</th></tr></thead><tbody>${
+    rows.map(x=>`<tr class="${x.r===hl?"on":""}"><td>${x.r}</td><td class="${cls(x.m1)}">${pct(x.m1)}</td><td class="${cls(x.m12)}">${pct(x.m12,1)}</td><td>${won(x.ms)}</td><td>${won(x.mj)}</td><td>${ok(x.ratio)?x.ratio.toFixed(1)+"%":"–"}</td><td>${ok(x.yv)?x.yv.toFixed(2)+"%":"–"}</td><td>${ok(x.y12)?x.y12.toFixed(2)+"%":"–"}</td></tr>`).join("")}</tbody></table></div>
+  <p class="finding">서울 5개 권역: 도심권(종로·중구·용산), 동남권(강남·서초·송파·강동), 동북권(성동·광진·동대문·중랑·성북·강북·도봉·노원), 서남권(양천·강서·구로·금천·영등포·동작·관악), 서북권(은평·서대문·마포). 임대수익률 = 월세 × 12 ÷ (매매가 − 월세보증금).</p>`;
+});
+def(13,"오피스텔과 아파트 흐름","오피스텔 가격이 아파트를 따라가나, 따로 가나",false,(box)=>{
+  if(!OT)return box.innerHTML=noOT;
+  const r=otRegion(),dd=OT.index.dates,i0=Math.max(0,rangeStart(dd)),d=dd.slice(i0),ot=OT.index.values[r].slice(i0);
+  const ax=D.index.sale_apt,apt=ax.values[r]?d.map(x=>{const j=ax.dates.indexOf(x);return j>=0?ax.values[r][j]:null;}):null;
+  const series=[{v:ot,c:SER[1],end:true,n:"오피스텔"},...(apt?[{v:apt,c:SER[0],end:true,n:"아파트"}]:[])];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${r} 매매가격지수 · 2026-01 = 100 (두 지수 같은 기준) · 오피스텔은 2011년부터`;box.appendChild(sub);
+  const d1=document.createElement("div");box.appendChild(d1);const m={l:36,r:96,t:10,b:24};
+  const res=lineChart(d1,{n:d.length,series,w:560,h:210,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
+  endLabels(res,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${lastOk(s.v)[0]?.toFixed(1)}`})),d.length);
+  const sb=document.createElement("p");sb.className="sub";sb.style.margin="12px 0 4px";sb.textContent=`${r} 오피스텔 임대수익률 (%)`;box.appendChild(sb);
+  const y=OT.yield.values[r].slice(i0),d2=document.createElement("div");box.appendChild(d2);
+  const r2=lineChart(d2,{n:d.length,series:[{v:y,c:SER[2],end:true}],w:560,h:150,m:{l:36,r:60,t:8,b:22},yfmt:v=>v.toFixed(1)+"%",xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>임대수익률 ${ok(y[i])?y[i].toFixed(2)+"%":"–"}`});
+  endLabels(r2,[{v:lastOk(y)[0],t:lastOk(y)[0].toFixed(2)+"%"}],d.length);
+  const f=document.createElement("p");f.className="finding";f.innerHTML=`전년 같은 달 대비: 오피스텔 <b>${pct(chgN(OT.index.values[r],12),1)}</b>${apt?` · 아파트 <b>${pct(chgN(ax.values[r],12),1)}</b>`:""}`;box.appendChild(f);
+});
+def(14,"오피스텔 면적별","작은 오피스텔과 큰 오피스텔 중 어디가 더 오르고, 수익률은 어떤가",false,(box)=>{
+  if(!OT)return box.innerHTML=noOT;
+  const groups=Object.keys(OT.index.sizes),g=groups.includes(otRegion())?otRegion():"전국",sizes=Object.keys(OT.index.sizes[g]);
+  const val=(key,s)=>{const a=OT[key].sizes[g]?.[s];return a?lastOk(a)[0]:null;};
+  box.innerHTML=`<p class="sub">${g} · ${OT.asof} · 면적별 자료는 전국·수도권·서울·경기만 제공</p><div class="tbl"><table><thead><tr><th>면적</th><th>매매지수 전년</th><th>평균 매매가</th><th>평균 전세가</th><th>전세가율</th><th>임대수익률</th></tr></thead><tbody>${
+    sizes.map(s=>`<tr><td>${s}</td><td class="${cls(chgN(OT.index.sizes[g][s],12))}">${pct(chgN(OT.index.sizes[g][s],12),1)}</td><td>${won(val("mean_sale",s))}</td><td>${won(val("mean_jeonse",s))}</td><td>${ok(val("ratio",s))?val("ratio",s).toFixed(1)+"%":"–"}</td><td>${ok(val("yield",s))?val("yield",s).toFixed(2)+"%":"–"}</td></tr>`).join("")}</tbody></table></div><div id="ot-size"></div>`;
+  const dd=OT.index.dates,i0=Math.max(0,rangeStart(dd)),d=dd.slice(i0),series=sizes.map((s,j)=>({v:OT.index.sizes[g][s].slice(i0),c:SER[j],end:true,n:s}));
+  const res=lineChart($("#ot-size"),{n:d.length,series,w:560,h:200,m:{l:36,r:80,t:14,b:22},yfmt:v=>v.toFixed(0),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
+  endLabels(res,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${lastOk(s.v)[0]?.toFixed(1)}`})),d.length);
+  const lg=document.createElement("div");lg.className="legend";lg.innerHTML="면적별 매매가격지수 (2026-01 = 100) · 초소형 &lt; 소형 &lt; 중형 &lt; 중대형 &lt; 대형";box.appendChild(lg);
+});
+
+// ---------- shell ----------
+const GROUPS=[["g-sum","이달 요약","",[1]],["g-type","유형과 가격 수준","주간 자료에 없는 단독·연립과 실제 가격(만원)",[2,4,3,9]],["g-ratio","전세가율과 양극화","",[5,6,7]],["g-out","전망과 월세","",[8,10,11]],["g-ot","오피스텔","KB 월간 오피스텔 시계열 · 시가표준액 1억 이하 오피스텔은 취득세 중과 주택 수에서 빠질 수 있어 소액 투자 지역을 고를 때 참고",[12,13,14]]];
+const FULL=new Set([1,5,12]);
+function header(){
+  const r=state.region,ix=D.index,a=ser(ix[state.mode+"_apt"],r),n=ser(ix[state.mode+"_apt"],"전국");
+  $("#src").textContent=D.source;$("#src2").textContent=D.source;$("#asof").textContent=D.asof;$("#h-name").textContent=short(r);
+  $("#kpis").innerHTML=[[`아파트 ${M()} 전월`,chgN(a,1),2],[`아파트 ${M()} 전년`,chgN(a,12),1],[`전국 아파트 ${M()} 전년`,chgN(n,12),1]].map(([t,v,d])=>`<div class="kpi"><div class="k">${t}</div><div class="v ${cls(v)}">${pct(v,d)}</div></div>`).join("");
+  const rs=$("#f-region");if(!rs.options.length)REGIONS.forEach(x=>rs.add(new Option(x,x)));rs.value=r;rs.onchange=()=>{state.region=rs.value;render();};
+  const segs=(id,key)=>$$(`#${id} button`).forEach(b=>{b.setAttribute("aria-pressed",b.dataset.v===state[key]);b.onclick=()=>{state[key]=b.dataset.v;render();};});
+  segs("f-mode","mode");segs("f-range","range");
+}
+function build(){const root=$("#panels"),byId=Object.fromEntries(P.map(p=>[p.id,p]));
+  $("#toc").innerHTML=GROUPS.map(g=>`<a href="#${g[0]}">${g[1]}</a>`).join("");
+  for(const [gid,title,sub,ids] of GROUPS){const g=document.createElement("section");g.className="group";g.id=gid;g.innerHTML=`<h2>${title}</h2>${sub?`<p class="gsub">${sub}</p>`:""}<div class="grid"></div>`;root.appendChild(g);
+    for(const id of ids){const p=byId[id],s=document.createElement("section");s.className="panel"+(FULL.has(id)?" wide":"");s.id="p"+id;
+      s.innerHTML=id===1?`<div class="body"></div>`:`<div class="ph"><h2>${p.title}</h2></div><p class="q">${p.q}</p><div class="body"></div>`;g.querySelector(".grid").appendChild(s);}}}
+function render(){if(!REGIONS.includes(state.region))state.region="서울특별시";loadSer();if(!$("#panels").children.length)build();header();
+  for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}save();}
+render();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+</script>

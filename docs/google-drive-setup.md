@@ -55,10 +55,23 @@ python3 scripts/kb_drive.py --list                   # 폴더의 파일 목록�
 python3 scripts/kb_dashboard.py --drive              # 최신 파일 받기 + 국면판 생성
 ```
 
-## 매주 할 일
+## 매주·매월 할 일
 
-1. KB부동산에서 받은 엑셀을 파일 이름 그대로(`20260928_주간시계열.xlsx` 등) 드라이브 폴더에 올립니다.
-2. `python3 scripts/kb_dashboard.py --drive`를 실행합니다.
+KB부동산에서 받은 엑셀을 파일 이름 그대로 드라이브 폴더에 올립니다. 이름 앞의 날짜로 최신 파일을 고릅니다.
+
+| 자료 | 파일 이름 예 | 주기 | 화면 |
+|---|---|---|---|
+| 주간 아파트 | `20260928_주간시계열.xlsx` | 매주 | `index.html` 주간 아파트 국면판 |
+| 월간 주택 | `202610_월간 주택 시계열.xlsx` | 매월 | `monthly.html` 월간 주택 시장판 |
+| 월간 오피스텔 | `202610_월간 오피스텔 시계열.xlsx` | 매월 | `monthly.html`의 오피스텔 구역 (없으면 그 구역만 비어 있음) |
+
+이 컴퓨터에서 직접 만들 때:
+
+```bash
+python3 scripts/kb_dashboard.py --drive           # 주간
+python3 scripts/kb_monthly_dashboard.py --drive   # 월간 주택 + 오피스텔
+python3 scripts/kb_drive.py --list                # 드라이브에 있는 KB 파일 목록
+```
 
 ## 동작 방식
 
@@ -78,7 +91,7 @@ python3 scripts/kb_dashboard.py --drive              # 최신 파일 받기 + �
 
 ## GitHub Actions로 자동 게시 (GitHub Pages)
 
-`.github/workflows/dashboard.yml`이 매일 09:00(한국 시간)에 드라이브의 최신 파일로 국면판을 만들어 `https://hanspak.github.io/house/`에 올립니다. 드라이브에 새 파일을 올린 뒤 바로 보고 싶으면 **Actions → 국면판 갱신 → Run workflow**를 누릅니다.
+`.github/workflows/dashboard.yml`이 매일 09:00(한국 시간)에 드라이브의 최신 파일로 주간 국면판(`https://hanspak.github.io/house/`)과 월간 주택 시장판(`https://hanspak.github.io/house/monthly.html`)을 만들어 올립니다. 드라이브에 새 파일을 올린 뒤 바로 보고 싶으면 **Actions → 국면판 갱신 → Run workflow**를 누릅니다.
 
 ### 처음 한 번 설정
 
@@ -92,3 +105,5 @@ python3 scripts/kb_dashboard.py --drive              # 최신 파일 받기 + �
 - 무료 GitHub Pages 주소는 누구나 볼 수 있습니다. 화면에는 KB 공개 통계만 들어 있고, 키와 폴더 id는 들어가지 않습니다.
 - 키는 GitHub Secrets에만 저장되고, 실행 로그에는 `***`로 가려집니다. 실행이 끝나면 작업 공간의 키 파일도 지웁니다.
 - 실행이 실패하면 Actions 탭에서 빨간 표시를 눌러 로그를 보면 됩니다. 메시지별 원인은 위의 "문제 해결" 표와 같습니다.
+- **자료가 오래되면 알림 메일이 옵니다.** 주간 기준일이 14일, 월간 기준월이 2개월을 넘으면 화면은 그대로 올리고 마지막 `freshness` 작업만 실패시킵니다. 새 파일을 올리면 다음 실행부터 사라집니다. 현재 기준일은 `https://hanspak.github.io/house/status.json`에서도 볼 수 있습니다.
+- **KB가 엑셀 구조를 바꾸면** 추출 단계의 점검(지역 수, 날짜 연속성 등)이 실패해 배포하지 않습니다. 이때는 이전 화면이 그대로 남고 실패 메일이 옵니다.

@@ -13,13 +13,17 @@ house/
 ├─ templates/
 │  ├─ property.yaml              # 매물 데이터 표준 템플릿 (7장, 8장)
 │  └─ search.md                  # 검색 기록 템플릿 (17장)
-├─ kbdata/                       # KB 주간시계열 원본 (YYYYMMDD_주간시계열.xlsx, 아파트만)
+├─ kbdata/                       # KB 원본 (YYYYMMDD_주간시계열.xlsx, YYYYMM_월간 주택 시계열.xlsx, YYYYMM_월간 오피스텔 시계열.xlsx)
 ├─ scripts/
-│  ├─ kb_extract.py              # 엑셀 → JSON 추출
-│  ├─ kb_dashboard.py            # 국면판 HTML 생성 (인자 없으면 kbdata/ 최신 파일, --drive면 드라이브에서 받음)
-│  ├─ kb_drive.py                # 구글 드라이브 폴더에서 최신 주간시계열 내려받기 (서비스 계정)
-│  └─ dashboard_template.html    # 국면판 화면 템플릿
-├─ .github/workflows/dashboard.yml  # 매일 드라이브 최신 파일로 국면판 → GitHub Pages
+│  ├─ kb_extract.py              # 주간 엑셀 → JSON 추출 (+구조 점검)
+│  ├─ kb_dashboard.py            # 주간 국면판 HTML 생성 (인자 없으면 kbdata/ 최신 파일, --drive면 드라이브에서 받음)
+│  ├─ dashboard_template.html    # 주간 국면판 화면 템플릿
+│  ├─ kb_monthly_extract.py      # 월간 주택·오피스텔 엑셀 → JSON 추출 (+구조 점검)
+│  ├─ kb_monthly_dashboard.py    # 월간 주택 시장판 HTML 생성 (--drive 지원)
+│  ├─ monthly_template.html      # 월간 주택 시장판 화면 템플릿
+│  ├─ kb_drive.py                # 구글 드라이브에서 최신 주간·월간 주택·월간 오피스텔 파일 내려받기 (서비스 계정)
+│  └─ kb_status.py               # 자료 기준일 기록(dashboard/status.json)과 오래됨 점검
+├─ .github/workflows/dashboard.yml  # 매일 드라이브 최신 파일로 주간(index)·월간(monthly) 대시보드 → GitHub Pages
 ├─ docs/google-drive-setup.md    # 드라이브 연동·자동 게시 설정 방법
 ├─ secrets/                      # 서비스 계정 키·폴더 id (Git 제외, 절대 커밋 금지)
 └─ dashboard/                    # 생성된 국면판 (kb_dashboard_기준일.html, latest.html)

@@ -1,4 +1,6 @@
-# 구글 드라이브의 최신 KB 주간시계열로 국면판을 만들어 GitHub Pages에 올린다.
+# 구글 드라이브의 최신 KB 주간·월간 시계열로 대시보드를 만들어 GitHub Pages에 올린다.
+#   index.html   = 주간 아파트 국면판,  monthly.html = 월간 주택 시장판(오피스텔 포함)
+# 자료가 오래되면(주간 14일, 월간 2개월 초과) 배포는 하되 마지막 'freshness' 작업을 실패시켜 메일 알림을 받는다.
 # 필요한 저장소 Secrets: KB_SA_KEY_JSON (서비스 계정 키 JSON 전체), KB_DRIVE_FOLDER_ID
 name: 국면판 갱신
 
@@ -24,6 +26,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.fresh.outputs.stale }}
+      message: ${{ steps.fresh.outputs.message }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,16 +48,26 @@ jobs:
           printf '%s' "$KB_SA_KEY_JSON" > secrets/kb-drive-sa.json
           chmod 600 secrets/kb-drive-sa.json
 
-      - name: 드라이브에서 받아 국면판 생성
+      - name: 드라이브에서 받아 주간 국면판 생성
         env:
           KB_DRIVE_FOLDER_ID: ${{ secrets.KB_DRIVE_FOLDER_ID }}
         run: python scripts/kb_dashboard.py --drive
+
+      - name: 드라이브에서 받아 월간 주택 시장판 생성
+        env:
+          KB_DRIVE_FOLDER_ID: ${{ secrets.KB_DRIVE_FOLDER_ID }}
+        run: python scripts/kb_monthly_dashboard.py --drive
+
+      - name: 자료 기준일 점검
+        id: fresh
+        run: python scripts/kb_status.py check >> "$GITHUB_OUTPUT"
 
       - name: Pages 파일 준비
         run: |
           mkdir -p _site
           cp dashboard/latest.html _site/index.html
-          cp dashboard/kb_dashboard_*.html _site/
+          cp dashboard/monthly.html _site/monthly.html
+          cp dashboard/kb_dashboard_*.html dashboard/monthly_*.html dashboard/status.json _site/
           touch _site/.nojekyll
 
       - name: 키 파일 삭제
@@ -72,3 +87,13 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  freshness:
+    needs: [build, deploy]
+    if: needs.build.outputs.stale == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 자료가 오래됨
+        run: |
+          echo "::error::${{ needs.build.outputs.message }}"
+          exit 1
