@@ -1,0 +1,384 @@
+<title>실거래·거래량·금리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f5f6f8; --surface:#fcfcfb; --ink:#14171c; --ink-2:#4b5059; --ink-3:#7c818b;
+  --line:#dfe2e7; --grid:#eceef1; --chip:#e9ecf1;
+  --up:#d03b3b; --up-2:#e98a82; --mid:#f0efec; --down-2:#86b6ef; --down:#256abf; --accent:#1c5cab;
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#008300; --c7:#4a3aa7; --c8:#e34948;
+  --sans:"IBM Plex Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121417; --surface:#1a1c1f; --ink:#f3f4f6; --ink-2:#c3c6cc; --ink-3:#8d929b;
+    --line:#2e3238; --grid:#25282d; --chip:#262a30;
+    --up:#e66767; --up-2:#8a3b3b; --mid:#383835; --down-2:#2f5687; --down:#5598e7; --accent:#86b6ef;
+    --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300; --c7:#9085e9; --c8:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121417; --surface:#1a1c1f; --ink:#f3f4f6; --ink-2:#c3c6cc; --ink-3:#8d929b;
+  --line:#2e3238; --grid:#25282d; --chip:#262a30;
+  --up:#e66767; --up-2:#8a3b3b; --mid:#383835; --down-2:#2f5687; --down:#5598e7; --accent:#86b6ef;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300; --c7:#9085e9; --c8:#e66767;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:32px 110px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:16px;margin-bottom:16px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--ink-3)}
+h1{font-size:28px;line-height:1.25;margin:4px 0 0;font-weight:700}
+.lede{color:var(--ink-2);max-width:76ch;margin:6px 0 0;font-size:14px}
+.kpis{display:flex;flex-wrap:wrap;gap:22px}
+.kpi .k{font-size:12px;color:var(--ink-3)}
+.kpi .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:6}
+.ctl{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;font-size:13px;padding:5px 11px;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+select{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lowgrid{grid-template-columns:minmax(0,.75fr) minmax(0,1.5fr)}
+@media (max-width:960px){.grid,.lowgrid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px 18px;min-width:0;scroll-margin-top:80px}
+.panel.wide{grid-column:1/-1}
+.panel.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ph{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:2px}
+.ph h2{font-size:17px;margin:0;line-height:1.3}
+.ph h2 .no{font-family:var(--mono);font-size:13px;color:var(--accent);margin-right:6px;font-weight:500}
+.ph .src{font-size:11.5px;color:var(--ink-3);font-weight:400;margin-left:6px}
+.sub{font-size:12.5px;color:var(--ink-3);margin:2px 0 10px}
+.q{font-size:13px;color:var(--ink-2);margin:0 0 10px}
+.finding{font-size:13.5px;background:var(--chip);border-radius:8px;padding:9px 12px;margin:10px 0 0}
+.finding b{font-weight:600}
+svg{display:block;max-width:100%;height:auto;font-family:var(--sans)}
+svg text{fill:var(--ink-2);font-size:11px}
+svg .muted{fill:var(--ink-3)}
+svg .strong{fill:var(--ink);font-weight:600}
+svg .sel{fill:var(--ink);font-weight:700;font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2);margin-top:8px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.legend .dash{width:16px;height:0;border-top:1.5px dashed var(--ink-3);border-radius:0;vertical-align:3px}
+.ramp{display:inline-flex;height:10px;border-radius:2px;overflow:hidden;margin:0 6px;vertical-align:-1px}
+.ramp b{width:16px}
+.empty{font-size:13px;color:var(--ink-3);padding:36px 0;text-align:center}
+.up{color:var(--up)} .down{color:var(--down)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.state{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--chip);color:var(--ink-2)}
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:8px 0 12px;font-size:12px}
+@media (max-width:560px){.stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.stats div{border:1px solid var(--line);border-radius:7px;padding:5px 8px}
+.stats dt{color:var(--ink-3);font-size:11px}
+.stats dd{margin:0;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
+.sm{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media (max-width:900px){.sm{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:520px){.sm{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sm button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:6px 8px 4px;display:block;min-width:0}
+.sm button:hover{border-color:var(--ink-3)}
+.sm button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sm button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sm .n{font-size:12.5px;font-weight:600;display:flex;justify-content:space-between;gap:4px}
+.sm .n span{font-family:var(--mono);font-weight:500;font-size:11.5px}
+.sm .m{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.tbl{overflow-x:auto;max-height:460px;overflow-y:auto}
+table{border-collapse:collapse;font-size:13px;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:600;color:var(--ink-2);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th:focus-visible{outline:2px solid var(--accent)}
+tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-weight:600}
+.gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:520px){.gauges{grid-template-columns:1fr}}
+.gauge{border:1px solid var(--line);border-radius:8px;padding:9px 11px 5px}
+.gauge .k{font-size:12.5px;color:var(--ink-2);display:flex;justify-content:space-between;gap:6px;align-items:center}
+.gauge .v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1.2;font-variant-numeric:tabular-nums}
+.gauge .d{font-size:11.5px;color:var(--ink-3)}
+.pill{font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px;white-space:nowrap}
+.pill.hot{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.pill.cool{background:color-mix(in srgb,var(--down) 16%,transparent);color:var(--down)}
+.pill.norm{background:var(--chip);color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chips button{all:unset;cursor:pointer;font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2)}
+.chips button[aria-pressed="true"]{color:var(--ink);font-weight:600;border-color:currentColor}
+.chips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chips i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.tile{cursor:pointer}
+.tile:focus-visible rect{stroke:var(--accent);stroke-width:2.5}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.45;padding:6px 9px;border-radius:6px;z-index:9;max-width:280px;font-variant-numeric:tabular-nums}
+.note{font-size:12.5px;color:var(--ink-3);max-width:96ch;margin-top:18px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;margin:0 0 14px}
+.toc a{color:var(--accent);text-decoration:none;font-weight:500}
+.toc a:hover,.toc a:focus-visible{text-decoration:underline}
+.group{margin:0 0 26px;scroll-margin-top:70px}
+.group>h2{font-size:19px;margin:0 0 2px}
+.group>.gsub{font-size:13px;color:var(--ink-3);margin:0 0 12px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.facts{grid-template-columns:1fr}}
+.fact{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.fact .k{font-size:12px;color:var(--ink-3)}
+.fact .v{font-family:var(--mono);font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.3}
+.fact .d{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.site{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;font-size:13px}
+.site a{padding:4px 12px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2);text-decoration:none;font-weight:500}
+.site a:hover{border-color:var(--ink-3)}
+.site a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.site a[aria-current]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+</style>
+<div class="wrap">
+<nav class="site" aria-label="대시보드 이동"><a href="index.html">주간 아파트 국면판</a><a href="monthly.html">월간 주택 시장판</a><a href="trades.html" aria-current="page">실거래·거래량·금리</a></nav>
+<header>
+  <div>
+    <div class="eyebrow">국토교통부 실거래가 · 한국부동산원 R-ONE · 한국은행 ECOS · 수집 <span id="collected"></span></div>
+    <h1><span id="h-name"></span> 실거래·거래량·금리</h1>
+    <p class="lede">KB 지수가 아닌 실제 신고된 거래로 본 화면입니다. 서울 25개 구의 아파트·연립다세대·오피스텔 매매 실거래(최근 24개월), 한국부동산원 아파트 거래량(2006~), 한국은행 금리를 보여줍니다. 위에서 구와 주택 유형을 바꾸면 화면이 함께 바뀝니다.</p>
+  </div>
+  <div class="kpis" id="kpis"></div>
+</header>
+<div class="controls" role="toolbar" aria-label="보기 설정">
+  <div class="ctl"><label for="f-gu">지역</label><select id="f-gu"></select></div>
+  <div class="ctl">유형 <div class="seg" id="f-type"><button data-v="apt">아파트</button><button data-v="rh">연립·다세대</button><button data-v="offi">오피스텔</button></div></div>
+</div>
+<nav class="toc" aria-label="구역 이동" id="toc"></nav>
+<div id="panels"></div>
+<p class="note">출처: 국토교통부 실거래가 공개시스템 API(아파트 매매 상세, 연립다세대 매매, 오피스텔 매매), 한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황, 한국은행 ECOS(기준금리, 예금은행 신규취급액 기준 대출금리). 실거래는 계약일 기준이며 신고 기한이 계약 후 30일이라 <b>최근 1~2개월 건수는 계속 늘어납니다</b>(화면에 '집계 중' 표시). 해제 신고된 거래는 뺐습니다. KB 시세는 조사된 시세(중위)로, 실제 거래가와 같은 값이 아닙니다. <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const D = /*DATA*/;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+function txt(p,x,y,s,a={}){const t=el("text",{x,y,...a},p);t.textContent=s;return t;}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ok=v=>v!=null&&isFinite(v);
+const fmt=(v,d=2)=>ok(v)?(v>0?"+":"")+v.toFixed(d):"–";
+const pct=(v,d=2)=>ok(v)?fmt(v,d)+"%":"–";
+const cls=v=>ok(v)?(v>0?"up":v<0?"down":""):"";
+const tip=$("#tip");
+function showTip(e,h){tip.innerHTML=h;tip.hidden=false;const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+"px";tip.style.top=y+"px";}
+const hideTip=()=>tip.hidden=true;
+function nice(lo,hi,n){if(hi-lo<1e-6){lo-=1;hi+=1;}const raw=(hi-lo)/n,p=10**Math.floor(Math.log10(raw)),st=[1,2,2.5,5,10].map(m=>m*p).find(m=>m>=raw);return [Math.floor(lo/st)*st,Math.ceil(hi/st)*st,st];}
+const pad=(lo,hi)=>{const d=(hi-lo)*0.05||1;return [lo-d,hi+d];};
+let SER=[];const loadSer=()=>SER=Array.from({length:8},(_,i)=>css("--c"+(i+1)));
+function mix(a,b,t){const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));const A=p(a),B=p(b);return "#"+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,"0")).join("");}
+function div(v,lim){const t=Math.max(-1,Math.min(1,v/lim)),mid=css("--mid");if(t>=0)return t<.5?mix(mid,css("--up-2"),t*2):mix(css("--up-2"),css("--up"),(t-.5)*2);const u=-t;return u<.5?mix(mid,css("--down-2"),u*2):mix(css("--down-2"),css("--down"),(u-.5)*2);}
+
+// ---------- generic line chart ----------
+function lineChart(box,{n,series,w=560,h=220,m={l:40,r:16,t:10,b:24},yfmt=v=>+v.toFixed(1),xlab,refs=[],hover,lo:LO,hi:HI}){
+  const all=series.flatMap(s=>s.v.filter(ok)).concat(refs.map(r=>r.y));
+  const [lo,hi,st]=nice(LO??Math.min(...all),HI??Math.max(...all),5);
+  const X=i=>m.l+i/Math.max(1,n-1)*(w-m.l-m.r),Y=v=>h-m.b-(v-lo)/(hi-lo)*(h-m.t-m.b);
+  const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img"},box);
+  for(let v=lo;v<=hi+1e-9;v+=st){el("line",{x1:m.l,x2:w-m.r,y1:Y(v),y2:Y(v),stroke:css("--grid")},svg);txt(svg,m.l-6,Y(v)+4,yfmt(v),{"text-anchor":"end",class:"muted"});}
+  xlab&&xlab(svg,X,h,m,w);
+  refs.forEach(r=>el("line",{x1:m.l,x2:w-m.r,y1:Y(r.y),y2:Y(r.y),stroke:css("--ink-3"),"stroke-dasharray":r.dash||"4 3"},svg));
+  series.forEach(s=>{const d=s.v.map((v,i)=>!ok(v)?"":(i&&ok(s.v[i-1])?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join("");
+    el("path",{d,fill:"none",stroke:s.c,"stroke-width":s.wd||2,"stroke-linejoin":"round",opacity:s.op||1},svg);
+    if(s.end){let i=s.v.length-1;while(i>=0&&!ok(s.v[i]))i--;if(i>=0){el("circle",{cx:X(i),cy:Y(s.v[i]),r:4,fill:s.c,stroke:css("--surface"),"stroke-width":2},svg);s.label&&txt(svg,X(i)+8,(s.ly??Y(s.v[i]))+4,s.label,{class:"strong"});}}});
+  if(hover){const cross=el("line",{y1:m.t,y2:h-m.b,stroke:css("--ink-3"),visibility:"hidden"},svg);
+    const hit=el("rect",{x:m.l,y:0,width:w-m.l-m.r,height:h,fill:"transparent"},svg);
+    hit.addEventListener("mousemove",e=>{const b=svg.getBoundingClientRect();let i=Math.round(((e.clientX-b.left)/b.width*w-m.l)/(w-m.l-m.r)*(n-1));i=Math.max(0,Math.min(n-1,i));
+      const h_=hover(i);if(!h_)return;cross.setAttribute("x1",X(i));cross.setAttribute("x2",X(i));cross.setAttribute("visibility","visible");showTip(e,h_);});
+    hit.addEventListener("mouseleave",()=>{cross.setAttribute("visibility","hidden");hideTip();});}
+  return {svg,X,Y,lo,hi};
+}
+const yearLabels=(dates,every=0)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=every||Math.ceil((y1-y0+1)/7);
+  for(let y=y0;y<=y1;y++){if((y-y0)%e)continue;const i=dates.findIndex(d=>d>=y+"-01");if(i>0&&X(i)<w-m.r-12)txt(svg,X(i),h-6,y,{"text-anchor":"middle",class:"muted"});}};
+function scatterAxes(svg,{X,Y,x0,x1,xs,y0,y1,ys,m,w,h,xfmt=v=>(v>0?"+":"")+(+v.toFixed(1))+"%",yfmt=v=>(+v.toFixed(2))+"%"}){
+  for(let x=x0;x<=x1+1e-9;x+=xs){el("line",{x1:X(x),x2:X(x),y1:m.t,y2:h-m.b,stroke:Math.abs(x)<1e-9?css("--ink-3"):css("--grid")},svg);txt(svg,X(x),h-m.b+15,xfmt(x),{"text-anchor":"middle",class:"muted"});}
+  for(let y=y0;y<=y1+1e-9;y+=ys){el("line",{x1:m.l,x2:w-m.r,y1:Y(y),y2:Y(y),stroke:Math.abs(y)<1e-9?css("--ink-3"):css("--grid")},svg);txt(svg,m.l-7,Y(y)+4,yfmt(y),{"text-anchor":"end",class:"muted"});}}
+function placeLabels(svg,pts,{X,Y,m,w,want,cls_}){const placed=[];
+  for(const p of want){const cx=X(p),cy=Y(p),name=short(p.k),lw=name.length*11+4;
+    const cands=[[cx+10,cy+4,"start"],[cx-10,cy+4,"end"],[cx-lw/2,cy-10,"start"],[cx-lw/2,cy+18,"start"]];
+    const bx=c=>c[2]==="start"?[c[0],c[1]-10,c[0]+lw,c[1]+2]:[c[0]-lw,c[1]-10,c[0],c[1]+2];
+    const clash=b=>placed.some(q=>b[0]<q[2]&&b[2]>q[0]&&b[1]<q[3]&&b[3]>q[1])||pts.some(o=>o!==p&&X(o)>b[0]-6&&X(o)<b[2]+6&&Y(o)>b[1]-6&&Y(o)<b[3]+6)||b[0]<m.l||b[2]>w-m.r;
+    const c=cands.find(c=>!clash(bx(c)))||(p.force?cands[0]:null);if(c){placed.push(bx(c));txt(svg,c[0],c[1],name,{"text-anchor":c[2],class:cls_?.(p)||""});}}}
+function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fill:"transparent",tabindex:0,role:"button","aria-label":label},svg);h.style.cursor="pointer";
+  h.addEventListener("mousemove",e=>showTip(e,html));h.addEventListener("mouseleave",hideTip);
+  if(onclick){h.addEventListener("click",onclick);h.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onclick();}});}}
+
+// ---------- data ----------
+const TN=D.type_names, MS=D.months, AG=D.agg, EX=D.extra||{};
+const state={gu:"서울 전체",type:"rh",low:10000,lowType:"rh"};
+try{Object.assign(state,JSON.parse(localStorage.getItem("kb-trades")||"{}"));}catch(e){}
+const hg=new URLSearchParams(location.hash.slice(1)).get("gu");if(hg)state.gu=hg;
+const save=()=>{try{localStorage.setItem("kb-trades",JSON.stringify(state));}catch(e){}};
+const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
+const won=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
+const partial=m=>m>=D.partial_from;
+const full=MS.filter(m=>!partial(m)); // 신고가 거의 끝난 달
+const IDX=m=>MS.indexOf(m);
+const sum=(a,ix)=>ix.reduce((s,i)=>s+(a[i]||0),0);
+const medOf=(arr,ix)=>{const v=ix.map(i=>arr[i]).filter(ok).sort((x,y)=>x-y);return v.length?v[Math.floor(v.length/2)]:null;};
+const monthLabels=(dates)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=Math.max(1,Math.ceil((y1-y0+1)/7));
+  if(y1-y0<=2){dates.forEach((d,i)=>{if(d.endsWith("-01")||i===0)txt(svg,X(i),h-6,d.slice(2).replace("-","."),{"text-anchor":"middle",class:"muted"});});return;}
+  for(let y=y0;y<=y1;y++){if((y-y0)%e)continue;const i=dates.findIndex(d=>d>=y+"-01");if(i>0&&X(i)<w-m.r-12)txt(svg,X(i),h-6,y,{"text-anchor":"middle",class:"muted"});}};
+function endLabels(r,items,n){const lab=items.filter(l=>ok(l.v)).map(l=>({...l,y:r.Y(l.v)})).sort((a,b)=>a.y-b.y);for(let i=1;i<lab.length;i++)if(lab[i].y-lab[i-1].y<13)lab[i].y=lab[i-1].y+13;
+  const vb=r.svg.viewBox.baseVal,bottom=vb.height-18,over=lab.length?lab[lab.length-1].y-bottom:0;if(over>0)lab.forEach(l=>l.y-=over); // 아래로 넘치면 위로 올림
+  lab.forEach(l=>txt(r.svg,r.X(n-1)+8,l.y+4,l.t,{class:"strong"}));}
+function hbars(box,items,{fmt:f=v=>v.toFixed(1),hl,w=560,unit=""}){
+  const rows=items.filter(i=>ok(i.v)),bh=17,gap=4,m={l:70,r:84,t:4,b:4},h=m.t+rows.length*(bh+gap)+m.b,max=Math.max(...rows.map(r=>r.v),0),min=Math.min(...rows.map(r=>r.v),0);
+  const X=v=>m.l+(v-min)/((max-min)||1)*(w-m.l-m.r),svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img"},box);
+  rows.forEach((r,i)=>{const y=m.t+i*(bh+gap),on=r.k===hl,x0=X(Math.min(0,r.v)),x1=X(Math.max(0,r.v));
+    txt(svg,m.l-8,y+bh/2+4,r.label,{"text-anchor":"end",class:on?"sel":""});
+    el("rect",{x:x0,y,width:Math.max(1,x1-x0),height:bh,rx:3,fill:on?css("--c2"):css("--c1"),opacity:on?1:.8},svg);
+    txt(svg,x1+6,y+bh/2+4,f(r.v)+unit,{class:on?"sel":"strong"});
+    const hit=el("rect",{x:0,y,width:w,height:bh,fill:"transparent"},svg);hit.style.cursor=r.onclick?"pointer":"default";
+    hit.addEventListener("mousemove",e=>showTip(e,`<b>${r.label}</b><br>${f(r.v)}${unit}${r.extra?"<br>"+r.extra:""}`));hit.addEventListener("mouseleave",hideTip);if(r.onclick)hit.addEventListener("click",r.onclick);});
+  if(min<0)el("line",{x1:X(0),x2:X(0),y1:0,y2:h,stroke:css("--ink-3")},svg);
+}
+const goGu=g=>()=>{state.gu=g;render();};
+// 최근 3개 완결월과 1년 전 같은 3개월
+const last3=full.slice(-3).map(IDX), prev3=last3.map(i=>i-12).filter(i=>i>=0);
+const p3label=`${MS[last3[0]]}~${MS[last3[2]]}`;
+
+// ---------- panels ----------
+const P=[];const def=(id,title,q,wide,fn)=>P.push({id,title,q,wide,fn});
+
+def(1,"요약","",true,(box)=>{
+  const g=state.gu,f=[];
+  for(const k of ["apt","rh","offi"]){const a=AG[k][g],n3=sum(a.n,last3),n3p=prev3.length===3?sum(a.n,prev3):null,pp=medOf(a.ppa,last3),ppp=prev3.length===3?medOf(a.ppa,prev3):null;
+    const yo=ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN;
+    f.push(`<div class="fact"><div class="k">${TN[k]} 거래 (${p3label})</div><div class="v">${n3.toLocaleString()}건</div><div class="d">1년 전 같은 3개월 ${n3p!=null?n3p.toLocaleString()+"건":"–"}${n3p?` (${fmt((n3/n3p-1)*100,0)}%)`:""} · ㎡당 중위 ${won(pp)} (${pct(yo,1)})</div></div>`);}
+  const low=D.low.filter(r=>(g==="서울 전체"||r[1]===g)&&r[7]<=10000&&r[2].slice(0,7)>=MS[last3[0]]),lr=low.filter(r=>r[0]==="rh").length,lo=low.filter(r=>r[0]==="offi").length;
+  f.push(`<div class="fact"><div class="k">1억 이하 거래 (${p3label}~현재)</div><div class="v">${(lr+lo).toLocaleString()}건</div><div class="d">연립·다세대 ${lr}건 · 오피스텔 ${lo}건 · 아래 목록에서 확인</div></div>`);
+  const rt=EX.rates;if(rt){const [mv,mi]=lastOk(rt.values["주택담보대출"]),[bv]=lastOk(rt.values["기준금리"]);
+    f.push(`<div class="fact"><div class="k">주택담보대출 금리 (${rt.months[mi]})</div><div class="v">${ok(mv)?mv.toFixed(2)+"%":"–"}</div><div class="d">기준금리 ${ok(bv)?bv.toFixed(2)+"%":"–"} · 1년 전 주담대 ${ok(rt.values["주택담보대출"][mi-12])?rt.values["주택담보대출"][mi-12].toFixed(2)+"%":"–"}</div></div>`);}
+  const at=EX.apt_trades;if(at){const key=g==="서울 전체"?"서울":"서울>"+g,s=at.values[key];if(s){const [v,i]=lastOk(s);
+    f.push(`<div class="fact"><div class="k">부동산원 아파트 매매 거래 (${at.months[i]})</div><div class="v">${v.toLocaleString()}호</div><div class="d">1년 전 ${ok(s[i-12])?s[i-12].toLocaleString():"–"}호 · ${g==="서울 전체"?"서울":g}</div></div>`);}}
+  box.innerHTML=`<p class="sub">${g} · 최근 3개월은 신고가 거의 끝난 ${p3label} (그 뒤 달은 집계 중)</p><div class="facts">${f.join("")}</div>`;
+});
+
+def(2,"월별 거래량","유형별로 거래가 늘고 있나",false,(box)=>{
+  const g=state.gu,series=["apt","rh","offi"].map((k,j)=>({v:AG[k][g].n,c:SER[j],end:true,n:TN[k]}));
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${g} · 계약월 기준 건수 · 음영 = 신고 집계 중`;box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:96,t:10,b:24},h=240;
+  const r=lineChart(d_,{n:MS.length,series,w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(MS),lo:0,hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>`+series.map(s=>`${s.n} ${s.v[i].toLocaleString()}건`).join("<br>")});
+  const pi=MS.findIndex(partial);if(pi>=0)el("rect",{x:r.X(pi)-4,y:m.t,width:r.X(MS.length-1)-r.X(pi)+8,height:h-m.t-m.b,fill:css("--ink-3"),opacity:.1},r.svg);
+  endLabels(r,series.map(s=>({v:s.v[s.v.length-1],t:`${s.n} ${s.v[s.v.length-1]}`})),MS.length);
+});
+
+def(3,"선택 유형 ㎡당 중위 거래가","실제 거래된 가격은 오르고 있나",false,(box)=>{
+  const g=state.gu,k=state.type,a=AG[k][g];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`${g} ${TN[k]} · 전용 ㎡당 중위 거래가(만원) · 막대 = 거래 건수`;box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:44,r:70,t:10,b:24},h=230;
+  const r=lineChart(d_,{n:MS.length,series:[{v:a.ppa,c:SER[0],end:true}],w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>㎡당 ${won(a.ppa[i])} · 중위 ${won(a.price[i])}<br>${a.n[i]}건`});
+  const maxn=Math.max(...a.n,1),bw=(r.X(1)-r.X(0))*.6;
+  a.n.forEach((n,i)=>el("rect",{x:r.X(i)-bw/2,y:h-m.b-(n/maxn)*40,width:bw,height:(n/maxn)*40,fill:css("--ink-3"),opacity:partial(MS[i])?.15:.3},r.svg));
+  endLabels(r,[{v:lastOk(a.ppa)[0],t:`${won(lastOk(a.ppa)[0])}/㎡`}],MS.length);
+  const pp=medOf(a.ppa,last3),ppp=prev3.length===3?medOf(a.ppa,prev3):null;
+  const f=document.createElement("p");f.className="finding";f.innerHTML=`${p3label} ㎡당 중위 <b>${won(pp)}</b> · 1년 전 같은 기간 ${won(ppp)} (<b>${pct(ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN,1)}</b>). 전용 ${k==="apt"?84:59}㎡로 환산하면 약 ${won(ok(pp)?pp*(k==="apt"?84:59):null)}.`;box.appendChild(f);
+});
+
+def(4,"구별 비교","어느 구에서 거래가 많고, 실거래가가 많이 올랐나",true,(box)=>{
+  const k=state.type,rows=D.gus.map(g=>{const a=AG[k][g],pp=medOf(a.ppa,last3),ppp=prev3.length===3?medOf(a.ppa,prev3):null,n3=sum(a.n,last3),n3p=prev3.length===3?sum(a.n,prev3):null;
+    return {g,n3,nchg:n3p?(n3/n3p-1)*100:NaN,price:medOf(a.price,last3),pp,yo:ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN};});
+  const key=state.sort4||"yo";rows.sort((a,b)=>((ok(b[key])?b[key]:-1e9)-(ok(a[key])?a[key]:-1e9)));
+  box.innerHTML=`<div class="card-head"><p class="sub" style="margin:0">${TN[k]} · ${p3label} 합계·중위 vs 1년 전 같은 3개월 · 줄을 누르면 그 구로 전환</p>
+  <div class="ctl"><label for="f-sort4">정렬</label><select id="f-sort4"><option value="yo">㎡당 가격 상승률</option><option value="pp">㎡당 가격</option><option value="n3">거래 건수</option><option value="nchg">거래 증가율</option></select></div></div>
+  <div class="tbl" style="margin-top:8px"><table><thead><tr><th>구</th><th>거래 건수</th><th>건수 증감</th><th>중위 거래가</th><th>㎡당 중위</th><th>㎡당 전년비</th></tr></thead><tbody>${
+    rows.map(r=>`<tr data-g="${r.g}" class="${r.g===state.gu?"on":""}"><td>${r.g}</td><td>${r.n3.toLocaleString()}</td><td class="${cls(r.nchg)}">${pct(r.nchg,0)}</td><td>${won(r.price)}</td><td>${won(r.pp)}</td><td class="${cls(r.yo)}">${pct(r.yo,1)}</td></tr>`).join("")}</tbody></table></div>`;
+  $("#f-sort4").value=key;$("#f-sort4").onchange=e=>{state.sort4=e.target.value;render();};
+  box.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=goGu(tr.dataset.g));
+});
+
+def(5,"소액 거래 (연립·다세대, 오피스텔)","실제로 1억·1.5억·2억 이하에 거래된 집은 어디에 있나",true,(box)=>{
+  const g=state.gu,lim=state.low,lt=state.lowType,rows=D.low.filter(r=>(lt==="all"||r[0]===lt)&&r[7]<=lim);
+  const byGu=D.gus.map(x=>({k:x,label:x,v:rows.filter(r=>r[1]===x).length,onclick:goGu(x)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const list=rows.filter(r=>g==="서울 전체"||r[1]===g);
+  box.innerHTML=`<div class="card-head"><p class="sub" style="margin:0">최근 12개월 실거래 · 금액 = 실제 거래가(공시가격 아님)</p>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><div class="seg" id="f-lt"><button data-v="rh">연립·다세대</button><button data-v="offi">오피스텔</button><button data-v="all">둘 다</button></div>
+   <div class="seg" id="f-low"><button data-v="10000">1억 이하</button><button data-v="15000">1.5억 이하</button><button data-v="20000">2억 이하</button></div></div></div>
+   <div class="grid lowgrid" style="gap:14px;margin-top:10px"><div><p class="sub">구별 건수 · 막대를 누르면 그 구 목록</p><div id="low-bars"></div></div>
+   <div><p class="sub">${g} 거래 목록 (최신순, ${list.length.toLocaleString()}건 중 최대 200건)</p><div class="tbl" style="max-height:520px"><table><thead><tr><th>계약일</th>${g==="서울 전체"?"<th>구</th>":""}<th>동</th><th>건물명</th><th>금액</th><th>전용㎡</th><th>층</th><th>유형</th><th>건축</th></tr></thead><tbody>${
+     list.slice(0,200).map(r=>`<tr><td>${r[2]}</td>${g==="서울 전체"?`<td>${r[1]}</td>`:""}<td>${r[3]}</td><td>${r[4]||"–"}</td><td><b>${won(r[7])}</b></td><td>${r[5].toFixed(1)}</td><td>${r[6]??"–"}</td><td>${r[0]==="offi"?"오피스텔":(r[9]||"연립·다세대")}</td><td>${r[8]??"–"}</td></tr>`).join("")}</tbody></table></div></div></div>`;
+  box.querySelectorAll("#f-lt button").forEach(b=>{b.setAttribute("aria-pressed",b.dataset.v===lt);b.onclick=()=>{state.lowType=b.dataset.v;render();};});
+  box.querySelectorAll("#f-low button").forEach(b=>{b.setAttribute("aria-pressed",+b.dataset.v===lim);b.onclick=()=>{state.low=+b.dataset.v;render();};});
+  hbars($("#low-bars"),byGu,{fmt:v=>v.toLocaleString(),unit:"건",hl:g,w:440});
+  const f=document.createElement("p");f.className="finding";f.textContent="공시가격 1억 이하 여부는 실거래가로 알 수 없습니다. 보통 공시가격이 거래가보다 낮아서, 이 목록은 공시가격 1억 이하 후보를 좁히는 데 쓰고 최종 확인은 부동산공시가격알리미에서 하세요. 반지하(층 -1)가 많이 섞여 있습니다.";box.appendChild(f);
+});
+
+def(6,"KB 시세 vs 실거래","KB가 조사한 시세와 실제 거래가는 얼마나 다른가 (서울)",false,(box)=>{
+  const kb=D.kb;if(!kb)return box.innerHTML='<div class="empty">KB 월간 자료가 없어 비교할 수 없습니다</div>';
+  const k=state.type==="offi"?"apt":state.type,kbS=k==="apt"?kb.apt:kb.row,a=AG[k]["서울 전체"];
+  const kbv=MS.map(m=>{const j=kb.dates.indexOf(m);return j>=0?kbS[j]:null;});
+  const series=[{v:kbv,c:SER[0],end:true,n:"KB 중위 시세"},{v:a.price,c:SER[1],end:true,n:"실거래 중위"}];
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`서울 ${TN[k]} 중위 매매가(억) · KB 월간 시세 vs 국토부 실거래${state.type==="offi"?" (오피스텔은 KB 비교 자료가 없어 아파트로 표시)":""}`;box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:110,t:10,b:24};
+  const sc=series.map(s=>({...s,v:s.v.map(x=>ok(x)?x/10000:null)}));
+  const r=lineChart(d_,{n:MS.length,series:sc,w:560,h:230,m,yfmt:v=>v.toFixed(1),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}</b><br>`+series.map(s=>`${s.n} ${won(s.v[i])}`).join("<br>")});
+  endLabels(r,sc.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${ok(lastOk(s.v)[0])?lastOk(s.v)[0].toFixed(2)+"억":""}`})),MS.length);
+  const [kv,ki]=lastOk(kbv),av=a.price[ki];
+  const f=document.createElement("p");f.className="finding";f.innerHTML=ok(kv)&&ok(av)?`${MS[ki]} 기준 KB 중위 시세 <b>${won(kv)}</b>, 실거래 중위 <b>${won(av)}</b> (차이 ${fmt((kv/av-1)*100,1)}%). 실거래 중위는 그 달 거래된 집의 구성(지역·면적)에 따라 크게 달라지고, KB 시세는 전체 표본 기준이라 두 값이 다릅니다.`:"비교할 같은 달 자료가 없습니다.";box.appendChild(f);
+});
+
+def(7,"부동산원 아파트 매매 거래량","거래량은 과거와 비교해 많은가 (2006~)",false,(box)=>{
+  const at=EX.apt_trades;if(!at)return box.innerHTML='<div class="empty">R-ONE 자료 없음</div>';
+  const g=state.gu,key=g==="서울 전체"?"서울":"서울>"+g,keys=[key,...(g==="서울 전체"?["전국"]:["서울"])].filter(k=>at.values[k]);
+  const dd=at.months,i0=dd.findIndex(d=>d>="2015-01"),d=dd.slice(i0);
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`월별 아파트 매매 거래 (호) · 한국부동산원 · 2015년 이후 · 12개월 이동평균(굵은 선)`;box.appendChild(sub);
+  keys.forEach((k,j)=>{const v=at.values[k].slice(i0),ma=v.map((_,i)=>{const w=v.slice(Math.max(0,i-11),i+1).filter(ok);return w.length===12?w.reduce((a,b)=>a+b,0)/12:null;});
+    const t=document.createElement("p");t.className="sub";t.style.margin="8px 0 2px";t.textContent=k.replace(">"," ");box.appendChild(t);
+    const d_=document.createElement("div");box.appendChild(d_);
+    const r=lineChart(d_,{n:d.length,series:[{v,c:SER[j],wd:1,op:.45},{v:ma,c:SER[j],wd:2.2,end:true}],w:560,h:150,m:{l:46,r:70,t:8,b:22},lo:0,yfmt:x=>x>=1000?(x/1000).toFixed(0)+"천":x.toFixed(0),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>${k} ${ok(v[i])?v[i].toLocaleString():"–"}호<br>12개월 평균 ${ok(ma[i])?Math.round(ma[i]).toLocaleString():"–"}`});
+    endLabels(r,[{v:lastOk(v)[0],t:`${lastOk(v)[0]?.toLocaleString()}`}],d.length);});
+});
+
+def(8,"금리","대출 금리는 오르고 있나, 내리고 있나",false,(box)=>{
+  const rt=EX.rates;if(!rt)return box.innerHTML='<div class="empty">ECOS 자료 없음</div>';
+  const dd=rt.months,i0=dd.findIndex(d=>d>="2015-01"),d=dd.slice(i0),names=Object.keys(rt.values);
+  const series=names.map((n,j)=>({v:rt.values[n].slice(i0),c:SER[j],end:true,wd:n==="주택담보대출"?2.6:1.6,n}));
+  const sub=document.createElement("p");sub.className="sub";sub.textContent="연 % · 대출금리는 예금은행 신규취급액 기준 · 2015년 이후";box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);
+  const r=lineChart(d_,{n:d.length,series,w:560,h:250,m:{l:36,r:120,t:10,b:24},lo:0,yfmt:x=>x.toFixed(1),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(2)+"%":"–"}`).join("<br>")});
+  endLabels(r,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${ok(lastOk(s.v)[0])?lastOk(s.v)[0].toFixed(2):""}`})),d.length);
+  const lg=document.createElement("div");lg.className="legend";lg.innerHTML=names.map((n,j)=>`<span><i style="background:${SER[j]}"></i>${n}</span>`).join("");box.appendChild(lg);
+});
+
+def(9,"금리와 거래량","금리가 내리면 거래가 늘었나 (서울 아파트)",false,(box)=>{
+  const rt=EX.rates,at=EX.apt_trades;if(!rt||!at)return box.innerHTML='<div class="empty">ECOS 또는 R-ONE 자료 없음</div>';
+  const start="2015-01",ms=at.months.filter(m=>m>=start),rate=ms.map(m=>{const j=rt.months.indexOf(m);return j>=0?rt.values["주택담보대출"][j]:null;}),vol=ms.map(m=>at.values["서울"][at.months.indexOf(m)]);
+  const sub=document.createElement("p");sub.className="sub";sub.textContent="같은 시간축의 두 차트 · 위 = 주택담보대출 금리(%) · 아래 = 서울 아파트 매매 거래(호, 부동산원)";box.appendChild(sub);
+  const hov=i=>`<b>${ms[i]}</b><br>주담대 ${ok(rate[i])?rate[i].toFixed(2)+"%":"–"}<br>서울 거래 ${ok(vol[i])?vol[i].toLocaleString()+"호":"–"}`;
+  const d1=document.createElement("div");box.appendChild(d1);const m={l:46,r:60,t:8,b:20};
+  const r1=lineChart(d1,{n:ms.length,series:[{v:rate,c:SER[0],end:true}],w:560,h:140,m,yfmt:x=>x.toFixed(1),xlab:()=>{},hover:hov});endLabels(r1,[{v:lastOk(rate)[0],t:lastOk(rate)[0]?.toFixed(2)+"%"}],ms.length);
+  const d2=document.createElement("div");box.appendChild(d2);
+  const r2=lineChart(d2,{n:ms.length,series:[{v:vol,c:SER[1],end:true}],w:560,h:150,m:{...m,b:24},lo:0,yfmt:x=>(x/1000).toFixed(0)+"천",xlab:monthLabels(ms),hover:hov});endLabels(r2,[{v:lastOk(vol)[0],t:lastOk(vol)[0]?.toLocaleString()}],ms.length);
+  // 상관계수 (월별 수준)
+  const pairs=ms.map((_,i)=>[rate[i],vol[i]]).filter(p=>ok(p[0])&&ok(p[1]));if(pairs.length>24){const mx=pairs.reduce((s,p)=>s+p[0],0)/pairs.length,my=pairs.reduce((s,p)=>s+p[1],0)/pairs.length;
+    const cov=pairs.reduce((s,p)=>s+(p[0]-mx)*(p[1]-my),0),sx=Math.sqrt(pairs.reduce((s,p)=>s+(p[0]-mx)**2,0)),sy=Math.sqrt(pairs.reduce((s,p)=>s+(p[1]-my)**2,0)),rr=cov/(sx*sy);
+    const f=document.createElement("p");f.className="finding";f.innerHTML=`2015년 이후 월별 주담대 금리와 서울 아파트 거래량의 상관계수 <b>${rr.toFixed(2)}</b> (−1에 가까울수록 금리가 낮을 때 거래가 많았음). 상관은 인과를 뜻하지 않으며, 대출 규제·공급 등 다른 요인도 함께 작용합니다.`;box.appendChild(f);}
+});
+
+// ---------- shell ----------
+const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","서울 25개 구 · 최근 24개월 · 계약월 기준",[2,3,4,5,6]],["g-vol","거래량과 금리","",[7,8,9]]];
+const FULL=new Set([1,4,5]);
+function header(){
+  $("#collected").textContent=D.collected+(D.failed?` · 수집 실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=state.gu==="서울 전체"?"서울":state.gu;
+  const a=AG[state.type][state.gu];
+  $("#kpis").innerHTML=[[`${TN[state.type]} 거래 ${p3label}`,sum(a.n,last3).toLocaleString()+"건",""],[`㎡당 중위`,won(medOf(a.ppa,last3)),""],[`중위 거래가`,won(medOf(a.price,last3)),""]].map(([t,v])=>`<div class="kpi"><div class="k">${t}</div><div class="v">${v}</div></div>`).join("");
+  const gs=$("#f-gu");if(!gs.options.length)["서울 전체",...D.gus].forEach(x=>gs.add(new Option(x,x)));gs.value=state.gu;gs.onchange=()=>{state.gu=gs.value;render();};
+  $$("#f-type button").forEach(b=>{b.setAttribute("aria-pressed",b.dataset.v===state.type);b.onclick=()=>{state.type=b.dataset.v;render();};});
+}
+function build(){const root=$("#panels"),byId=Object.fromEntries(P.map(p=>[p.id,p]));
+  $("#toc").innerHTML=GROUPS.map(g=>`<a href="#${g[0]}">${g[1]}</a>`).join("");
+  for(const [gid,title,sub,ids] of GROUPS){const g=document.createElement("section");g.className="group";g.id=gid;g.innerHTML=`<h2>${title}</h2>${sub?`<p class="gsub">${sub}</p>`:""}<div class="grid"></div>`;root.appendChild(g);
+    for(const id of ids){const p=byId[id],s=document.createElement("section");s.className="panel"+(FULL.has(id)?" wide":"");s.id="p"+id;
+      s.innerHTML=id===1?`<div class="body"></div>`:`<div class="ph"><h2>${p.title}</h2></div><p class="q">${p.q}</p><div class="body"></div>`;g.querySelector(".grid").appendChild(s);}}}
+function render(){if(!["서울 전체",...D.gus].includes(state.gu))state.gu="서울 전체";loadSer();if(!$("#panels").children.length)build();header();
+  for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}save();}
+render();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
+new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+</script>

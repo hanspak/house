@@ -21,11 +21,16 @@ house/
 │  ├─ kb_monthly_extract.py      # 월간 주택·오피스텔 엑셀 → JSON 추출 (+구조 점검)
 │  ├─ kb_monthly_dashboard.py    # 월간 주택 시장판 HTML 생성 (--drive 지원)
 │  ├─ monthly_template.html      # 월간 주택 시장판 화면 템플릿
+│  ├─ molit_trades.py            # 국토부 실거래가 API: 서울 25개 구 아파트·연립다세대·오피스텔 매매 (cache/에 저장)
+│  ├─ market_extra.py            # 부동산원 R-ONE 아파트 거래량, 한국은행 ECOS 금리 (cache/extra.json)
+│  ├─ kb_trades_dashboard.py     # 실거래·거래량·금리 HTML 생성
+│  ├─ trades_template.html       # 실거래·거래량·금리 화면 템플릿
 │  ├─ kb_drive.py                # 구글 드라이브에서 최신 주간·월간 주택·월간 오피스텔 파일 내려받기 (서비스 계정)
 │  └─ kb_status.py               # 자료 기준일 기록(dashboard/status.json)과 오래됨 점검
 ├─ .github/workflows/dashboard.yml  # 매일 드라이브 최신 파일로 주간(index)·월간(monthly) 대시보드 → GitHub Pages
 ├─ docs/google-drive-setup.md    # 드라이브 연동·자동 게시 설정 방법
-├─ secrets/                      # 서비스 계정 키·폴더 id (Git 제외, 절대 커밋 금지)
+├─ secrets/                      # 서비스 계정 키·폴더 id·API 키(api_keys.json) (Git 제외, 절대 커밋 금지)
+├─ cache/                        # 실거래·R-ONE·ECOS 응답 캐시 (Git 제외)
 └─ dashboard/                    # 생성된 국면판 (kb_dashboard_기준일.html, latest.html)
 ```
 
@@ -36,6 +41,7 @@ house/
 - 매물을 다시 확인하면 YAML의 `최종확인일`·`상태`·`sources[].확인일`을 갱신하고, 가격 등이 바뀌었으면 `변경이력`에 이전 값을 남긴다. `index.csv`도 같이 갱신한다.
 - 저장된 매물 조회는 먼저 `index.csv`로 거르고, 필요하면 개별 YAML을 읽는다.
 - 날짜는 `YYYY-MM-DD`, 가격은 만원 단위 정수(예: 10억 = 100000), 면적은 ㎡로 저장한다. 확인 안 된 값은 `미확인`.
+- 실거래가가 필요하면 `cache/trades.json`(서울 25개 구, 최근 24개월, `python3 scripts/molit_trades.py`로 갱신)을 먼저 확인한다. 이 값은 신고된 **실거래가**이며 호가가 아니다(14장).
 
 ---
 
