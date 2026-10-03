@@ -149,7 +149,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 </div>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
 <div id="panels"></div>
-<p class="note">출처: KB부동산 월간 주택 시계열(<span id="src2"></span>). 지수 기준 2026-01 = 100. KB는 2022년 11월 표본을 크게 늘렸습니다(아파트 약 6만 2천 개 면적, 단독 3천, 연립 2천5백). 그래서 평균·중위 가격, 전세가율, 5분위 가격은 2022-10 → 11월 사이에 계단처럼 바뀌어 있으며, KB는 시장 흐름은 지수 변동률로 보라고 안내합니다. HAI는 2019년부터 개편된 가계동향조사 소득을 씁니다. 국면·해석 문구는 이 화면이 정한 참고용입니다.</p>
+<p class="note">출처: KB부동산 월간 주택 시계열(<span id="src2"></span>). 지수 기준 2026-01 = 100. KB는 2022년 11월 표본을 크게 늘렸습니다(아파트 약 6만 2천 개 면적, 단독 3천, 연립 2천5백). 그래서 평균·중위 가격, 전세가율, 5분위 가격은 2022-10 → 11월 사이에 계단처럼 바뀌어 있으며, KB는 시장 흐름은 지수 변동률로 보라고 안내합니다. HAI는 2019년부터 개편된 가계동향조사 소득을 씁니다. 국면·해석 문구는 이 화면이 정한 참고용입니다. <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
 </div>
 <div id="tip" hidden></div>
 
@@ -217,6 +217,7 @@ const short=k=>k.includes("|")?k.split("|")[1]:k;
 const VIEWS=Object.fromEntries(D.views.map(v=>[v.id,v]));
 const state={region:"서울특별시",mode:"sale",range:"2008"};
 try{Object.assign(state,JSON.parse(localStorage.getItem("kb-monthly")||"{}"));}catch(e){}
+const hr=new URLSearchParams(location.hash.slice(1)).get("region");if(hr)state.region=hr;
 const save=()=>{try{localStorage.setItem("kb-monthly",JSON.stringify(state));}catch(e){}};
 const M=()=>MODE[state.mode];
 const ser=(obj,k)=>obj&&obj.values[k]?obj.values[k]:null;

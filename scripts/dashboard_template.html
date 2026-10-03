@@ -132,6 +132,13 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 .site a:hover{border-color:var(--ink-3)}
 .site a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .site a[aria-current]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.mon{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin:0 0 12px}
+.mon-h{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-3);margin-bottom:6px;flex-wrap:wrap}
+.mon-h a{color:var(--accent);text-decoration:none;font-weight:600}
+.mon-h a:hover,.mon-h a:focus-visible{text-decoration:underline}
+.mon-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.mon-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mon .k{font-size:11px;color:var(--ink-3)} .mon .v{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums} .mon .d{font-size:11px;color:var(--ink-3)}
 </style>
 
 <div class="wrap">
@@ -156,7 +163,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
 <div id="panels"></div>
 
-<p class="note">출처: KB부동산 주간 아파트 시계열(<span id="src2"></span>). 아파트만 포함합니다. 지수 기준 2026-01-12 = 100, 고점은 2021-01 ~ 2022-12 구간 최고치입니다. 심리지수는 KB가 중개업소를 설문해 0~200으로 만든 값으로 시·도 단위까지만 있습니다. 국면 이름, 백분위, 사이클 저점, 확산도는 이 화면이 계산한 참고용 값이며 KB 공식 지표가 아닙니다. 과거 패턴은 앞으로의 가격을 보장하지 않습니다.<span id="dropped"></span></p>
+<p class="note">출처: KB부동산 주간 아파트 시계열(<span id="src2"></span>). 아파트만 포함합니다. 지수 기준 2026-01-12 = 100, 고점은 2021-01 ~ 2022-12 구간 최고치입니다. 심리지수는 KB가 중개업소를 설문해 0~200으로 만든 값으로 시·도 단위까지만 있습니다. 국면 이름, 백분위, 사이클 저점, 확산도는 이 화면이 계산한 참고용 값이며 KB 공식 지표가 아닙니다. 과거 패턴은 앞으로의 가격을 보장하지 않습니다.<span id="dropped"></span> <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
 </div>
 
 <div id="tip" hidden></div>
@@ -249,6 +256,21 @@ function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fi
   h.addEventListener("mousemove",e=>showTip(e,html));h.addEventListener("mouseleave",hideTip);
   if(onclick){h.addEventListener("click",onclick);h.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onclick();}});}}
 
+
+// ---------- 월간 지표 (월간 주택 시계열에서 가져온 요약) ----------
+const MON=D.monthly||null;
+const provOf=k=>k.includes("|")?k.split("|")[0]:k;
+const won_=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
+function monthlyBlock(c){
+  if(!MON)return "";
+  const p=provOf(c),jr=MON.jr[c]||MON.jr[p],jrWho=MON.jr[c]?short(c):short(p),yo=MON.yoy[c],med=MON.med[p]||{},ol=MON.outlook[p]||{};
+  const cells=[[`아파트 전세가율 (${jrWho})`,jr?`${jr[0].toFixed(1)}%`:"–",jr&&ok(jr[1])?`1년 전 ${jr[1].toFixed(1)}%`:""],
+    [`아파트 매매 전년비 (${short(c)})`,ok(yo)?pct(yo,1):"–",""],
+    [`중위 아파트 매매가 (${short(p)})`,won_(med.sale),med.jeonse?`전세 ${won_(med.jeonse)}`:""],
+    [`3개월 뒤 매매 전망 (${short(p)})`,ok(ol.sale)?ol.sale.toFixed(1):"–",ok(ol.jeonse)?`전세 전망 ${ol.jeonse.toFixed(1)}`:""]];
+  return `<div class="mon"><div class="mon-h"><span>월간 지표 · ${MON.asof}</span><a href="monthly.html#region=${encodeURIComponent(MON.regions.includes(p)?p:"전국")}">월간 시장판에서 보기 →</a></div>
+  <div class="mon-g">${cells.map(([k,v,d])=>`<div><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join("")}</div></div>`;
+}
 // ---------- panels ----------
 const P=[];
 const def=(id,title,src,q,wide,fn)=>P.push({id,title,src,q,wide,fn});
@@ -280,7 +302,7 @@ def(2,"선택 지역 상세","국면판","선택한 지역의 매매·전세 흐
   const c=pickOf(),s=ST.sale[c],j=ST.jeonse[c];
   box.innerHTML=`<div class="card-head"><b style="font-size:16px">${short(c)}</b><span class="state">${M()} · ${phase(c)}</span></div>
   <div class="sub">${M()}지수 ${ok(STm()[c].idx)?STm()[c].idx.toFixed(1):"–"}${ok(STm()[c].peak)?` · ${M()} 고점 ${STm()[c].peak.toFixed(1)} (${STm()[c].peakDate})`:""}${STm()[c].first>"2008-12"?` · 자료 시작 ${STm()[c].first}`:""}</div>
-  <dl class="stats">${[["매매 4주",s.w4],["매매 12주",s.w12],["매매 52주",s.w52,1],["매매 고점 대비",s.pk,1],["서울·시도 52주",ST.sale[state.region].w52,1],["전세 4주",j.w4],["전세 12주",j.w12],["전세 52주",j.w52,1],["전세 고점 대비",j.pk,1],["시도 전세 52주",ST.jeonse[state.region].w52,1]].map(([t,val,d])=>`<div><dt>${t}</dt><dd class="${cls(val)}">${pct(val,d??2)}</dd></div>`).join("")}</dl>
+  <dl class="stats">${[["매매 4주",s.w4],["매매 12주",s.w12],["매매 52주",s.w52,1],["매매 고점 대비",s.pk,1],["서울·시도 52주",ST.sale[state.region].w52,1],["전세 4주",j.w4],["전세 12주",j.w12],["전세 52주",j.w52,1],["전세 고점 대비",j.pk,1],["시도 전세 52주",ST.jeonse[state.region].w52,1]].map(([t,val,d])=>`<div><dt>${t}</dt><dd class="${cls(val)}">${pct(val,d??2)}</dd></div>`).join("")}</dl>${monthlyBlock(c)}
   <div class="card-head"><span style="font-size:13px;font-weight:600">매매·전세 가격지수</span><div class="seg" id="f-range"><button data-v="3y">3년</button><button data-v="2021">2021~</button><button data-v="all">전체</button></div></div><div id="big"></div>
   <div class="legend"><span><i style="background:${SER[0]}"></i>매매지수</span><span><i style="background:${SER[1]}"></i>전세지수</span><span><i class="dash"></i>${M()} 2021~22 고점</span><span>두 지수 모두 2026-01-12 = 100 기준(흐름 비교용)</span></div>`;
   box.querySelector(".stats div:nth-child(5) dt").textContent=short(state.region)+" 매매 52주";box.querySelector(".stats div:nth-child(10) dt").textContent=short(state.region)+" 전세 52주";
