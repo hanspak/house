@@ -1,4 +1,4 @@
-"""한국부동산원 R-ONE(아파트 매매 거래량)과 한국은행 ECOS(금리)를 받아 cache/extra.json으로 저장한다.
+"""한국부동산원 R-ONE(아파트 매매 거래량, 미분양)과 한국은행 ECOS(금리)를 받아 cache/extra.json으로 저장한다.
 
 사용법: python3 scripts/market_extra.py
 
@@ -17,6 +17,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # R-ONE (월) 행정구역별 아파트매매거래현황 — 전국·시도·서울 구
 RONE_APT_TRADES = "A_2024_00554"
 RONE_COUNT_ITEM = 100001  # 동(호)수
+# R-ONE 미분양주택현황 — 시·도 '계'와 시군구. 전국 합계는 없어 시·도 '계'를 더한다.
+RONE_UNSOLD = "T237973129847263"
+CAPITAL = {"서울", "인천", "경기"}
 # ECOS: (통계표, 항목, 이름)
 ECOS_SERIES = [
     ("722Y001", "0101000", "기준금리"),
@@ -90,6 +93,37 @@ def _last_month(back=1):
     return d.strftime("%Y%m")
 
 
+PROV17 = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기",
+          "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"]
+
+
+def rone_unsold(key, start="200012"):
+    end = dt.date.today().strftime("%Y%m")
+    rows = rone_rows(key, STATBL_ID=RONE_UNSOLD, DTACYCLE_CD="MM", START_WRTTIME=start, END_WRTTIME=end)
+    prov = {p: {} for p in PROV17}
+    for r in rows:
+        full = r.get("CLS_FULLNM") or ""
+        name = full[:-2] if full.endswith(">계") else None
+        if name in prov:  # 원자료의 '전국>계' 등 집계 행은 쓰지 않고 시·도를 직접 더한다
+            prov[name][r["WRTTIME_IDTFR_ID"]] = r["DTA_VAL"]
+    months = sorted({m for s in prov.values() for m in s})
+    vals = {p: [s.get(m) for m in months] for p, s in prov.items()}
+    # 세종(2012년 출범)처럼 자료가 시작되기 전 달은 0으로 본다. 그 뒤의 빈 달은 그대로 비워 둔다.
+    for p, a in vals.items():
+        first = next((i for i, v in enumerate(a) if v is not None), len(a))
+        for i in range(first):
+            a[i] = 0
+
+    def total(names):
+        # 한 시·도라도 그 달 값이 없으면 합계를 만들지 않는다 (과소 집계 방지)
+        return [sum(vals[p][i] for p in names) if all(vals[p][i] is not None for p in names) else None
+                for i in range(len(months))]
+    agg = {"전국": total(PROV17), "수도권": total([p for p in PROV17 if p in CAPITAL]),
+           "지방": total([p for p in PROV17 if p not in CAPITAL])}
+    return {"months": [f"{m[:4]}-{m[4:]}" for m in months], "values": {**agg, **vals},
+            "source": "한국부동산원 R-ONE 미분양주택현황 (시·도 '계'를 더한 값, 단위 호. 17개 시·도가 모두 발표된 달만 전국 합계)"}
+
+
 def ecos_rates(key, start="201001"):
     end = dt.date.today().strftime("%Y%m")
     series = {}
@@ -111,6 +145,10 @@ def main():
         out["apt_trades"] = rone_apt_trades(rone)
         print(f"R-ONE 아파트 매매 거래량: {len(out['apt_trades']['values'])}개 지역, "
               f"{out['apt_trades']['months'][0]} ~ {out['apt_trades']['months'][-1]}")
+        out["unsold"] = rone_unsold(rone)
+        u = out["unsold"]
+        last = max(i for i, v in enumerate(u["values"]["전국"]) if v is not None)
+        print(f"R-ONE 미분양: {u['months'][0]} ~ {u['months'][-1]}, 전국 합계는 {u['months'][last]}까지 ({u['values']['전국'][last]:,}호)")
     else:
         print("R-ONE 키가 없어 거래량은 건너뜀")
     if ecos:

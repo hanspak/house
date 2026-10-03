@@ -139,7 +139,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
   <div>
     <div class="eyebrow">국토교통부 실거래가 · 한국부동산원 R-ONE · 한국은행 ECOS · 수집 <span id="collected"></span></div>
     <h1><span id="h-name"></span> 실거래·거래량·금리</h1>
-    <p class="lede">KB 지수가 아닌 실제 신고된 거래로 본 화면입니다. 서울 25개 구의 아파트·연립다세대·오피스텔 매매 실거래(최근 24개월), 한국부동산원 아파트 거래량(2006~), 한국은행 금리를 보여줍니다. 위에서 구와 주택 유형을 바꾸면 화면이 함께 바뀝니다.</p>
+    <p class="lede">KB 지수가 아닌 실제 신고된 거래로 본 화면입니다. 서울 25개 구의 아파트·연립다세대·오피스텔 매매 실거래(최근 24개월), 한국부동산원 아파트 거래량(2006~)과 미분양(2000~), 한국은행 금리를 보여줍니다. 위에서 구와 주택 유형을 바꾸면 화면이 함께 바뀝니다.</p>
   </div>
   <div class="kpis" id="kpis"></div>
 </header>
@@ -149,7 +149,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 </div>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
 <div id="panels"></div>
-<p class="note">출처: 국토교통부 실거래가 공개시스템 API(아파트 매매 상세, 연립다세대 매매, 오피스텔 매매), 한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황, 한국은행 ECOS(기준금리, 예금은행 신규취급액 기준 대출금리). 실거래는 계약일 기준이며 신고 기한이 계약 후 30일이라 <b>최근 1~2개월 건수는 계속 늘어납니다</b>(화면에 '집계 중' 표시). 해제 신고된 거래는 뺐습니다. KB 시세는 조사된 시세(중위)로, 실제 거래가와 같은 값이 아닙니다. <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
+<p class="note">출처: 국토교통부 실거래가 공개시스템 API(아파트 매매 상세, 연립다세대 매매, 오피스텔 매매), 한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황·미분양주택현황, 한국은행 ECOS(기준금리, 예금은행 신규취급액 기준 대출금리). 실거래는 계약일 기준이며 신고 기한이 계약 후 30일이라 <b>최근 1~2개월 건수는 계속 늘어납니다</b>(화면에 '집계 중' 표시). 해제 신고된 거래는 뺐습니다. KB 시세는 조사된 시세(중위)로, 실제 거래가와 같은 값이 아닙니다. <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
 </div>
 <div id="tip" hidden></div>
 
@@ -226,13 +226,13 @@ const monthLabels=(dates)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dat
 function endLabels(r,items,n){const lab=items.filter(l=>ok(l.v)).map(l=>({...l,y:r.Y(l.v)})).sort((a,b)=>a.y-b.y);for(let i=1;i<lab.length;i++)if(lab[i].y-lab[i-1].y<13)lab[i].y=lab[i-1].y+13;
   const vb=r.svg.viewBox.baseVal,bottom=vb.height-18,over=lab.length?lab[lab.length-1].y-bottom:0;if(over>0)lab.forEach(l=>l.y-=over); // 아래로 넘치면 위로 올림
   lab.forEach(l=>txt(r.svg,r.X(n-1)+8,l.y+4,l.t,{class:"strong"}));}
-function hbars(box,items,{fmt:f=v=>v.toFixed(1),hl,w=560,unit=""}){
-  const rows=items.filter(i=>ok(i.v)),bh=17,gap=4,m={l:70,r:84,t:4,b:4},h=m.t+rows.length*(bh+gap)+m.b,max=Math.max(...rows.map(r=>r.v),0),min=Math.min(...rows.map(r=>r.v),0);
+function hbars(box,items,{fmt:f=v=>v.toFixed(1),hl,w=560,unit="",right=84}){
+  const rows=items.filter(i=>ok(i.v)),bh=17,gap=4,m={l:70,r:right,t:4,b:4},h=m.t+rows.length*(bh+gap)+m.b,max=Math.max(...rows.map(r=>r.v),0),min=Math.min(...rows.map(r=>r.v),0);
   const X=v=>m.l+(v-min)/((max-min)||1)*(w-m.l-m.r),svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img"},box);
   rows.forEach((r,i)=>{const y=m.t+i*(bh+gap),on=r.k===hl,x0=X(Math.min(0,r.v)),x1=X(Math.max(0,r.v));
     txt(svg,m.l-8,y+bh/2+4,r.label,{"text-anchor":"end",class:on?"sel":""});
     el("rect",{x:x0,y,width:Math.max(1,x1-x0),height:bh,rx:3,fill:on?css("--c2"):css("--c1"),opacity:on?1:.8},svg);
-    txt(svg,x1+6,y+bh/2+4,f(r.v)+unit,{class:on?"sel":"strong"});
+    txt(svg,x1+6,y+bh/2+4,f(r.v)+unit+(r.note||""),{class:on?"sel":"strong"});
     const hit=el("rect",{x:0,y,width:w,height:bh,fill:"transparent"},svg);hit.style.cursor=r.onclick?"pointer":"default";
     hit.addEventListener("mousemove",e=>showTip(e,`<b>${r.label}</b><br>${f(r.v)}${unit}${r.extra?"<br>"+r.extra:""}`));hit.addEventListener("mouseleave",hideTip);if(r.onclick)hit.addEventListener("click",r.onclick);});
   if(min<0)el("line",{x1:X(0),x2:X(0),y1:0,y2:h,stroke:css("--ink-3")},svg);
@@ -360,8 +360,23 @@ def(9,"금리와 거래량","금리가 내리면 거래가 늘었나 (서울 아
     const f=document.createElement("p");f.className="finding";f.innerHTML=`2015년 이후 월별 주담대 금리와 서울 아파트 거래량의 상관계수 <b>${rr.toFixed(2)}</b> (−1에 가까울수록 금리가 낮을 때 거래가 많았음). 상관은 인과를 뜻하지 않으며, 대출 규제·공급 등 다른 요인도 함께 작용합니다.`;box.appendChild(f);}
 });
 
+
+def(10,"미분양 주택","분양하고 팔리지 않은 집이 늘고 있나 (전국·시·도)",false,(box)=>{
+  const u=EX.unsold;if(!u)return box.innerHTML='<div class="empty">R-ONE 미분양 자료 없음</div>';
+  const dd=u.months,i0=dd.findIndex(d=>d>="2008-01"),d=dd.slice(i0),keys=["전국","수도권","지방"];
+  const series=keys.map((k,j)=>({v:u.values[k].slice(i0),c:j?SER[j]:css("--ink"),wd:j?1.6:2.4,end:true,n:k}));
+  const [nv,ni]=lastOk(u.values["전국"]);
+  const sub=document.createElement("p");sub.className="sub";sub.textContent=`호 · 2008년 이후 · 전국 합계는 17개 시·도가 모두 발표된 달(${dd[ni]})까지`;box.appendChild(sub);
+  const d_=document.createElement("div");box.appendChild(d_);
+  const r=lineChart(d_,{n:d.length,series,w:560,h:220,m:{l:46,r:90,t:10,b:24},lo:0,yfmt:x=>x>=1000?(x/1000).toFixed(0)+"천":x.toFixed(0),xlab:monthLabels(d),hover:i=>`<b>${d[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toLocaleString()+"호":"–"}`).join("<br>")});
+  endLabels(r,series.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${lastOk(s.v)[0]?.toLocaleString()}`})),d.length);
+  const t=document.createElement("p");t.className="sub";t.style.margin="12px 0 4px";t.textContent=`시·도별 최근 미분양 (${dd[ni]}) · 막대 옆 = 1년 전 대비`;box.appendChild(t);
+  const items=Object.keys(u.values).filter(k=>!keys.includes(k)).map(k=>{const a=u.values[k],v=a[ni],p=a[ni-12];const chg=ok(v)&&ok(p)&&p?(v/p-1)*100:NaN;return {k,label:k,v,extra:`1년 전 ${ok(p)?p.toLocaleString():"–"}호`,note:ok(chg)?` (${fmt(chg,0)}%)`:""};}).filter(x=>ok(x.v)).sort((a,b)=>b.v-a.v);
+  const b_=document.createElement("div");box.appendChild(b_);hbars(b_,items,{fmt:v=>v.toLocaleString(),unit:"호",hl:"서울",w:560,right:130});
+  const f=document.createElement("p");f.className="finding";f.innerHTML=`${dd[ni]} 전국 미분양 <b>${nv.toLocaleString()}호</b> · 1년 전 ${ok(u.values["전국"][ni-12])?u.values["전국"][ni-12].toLocaleString():"–"}호 (<b>${pct(ok(u.values["전국"][ni-12])?(nv/u.values["전국"][ni-12]-1)*100:NaN,1)}</b>). 준공 후 미분양(악성 미분양)은 이 표에 따로 없습니다.`;box.appendChild(f);
+});
 // ---------- shell ----------
-const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","서울 25개 구 · 최근 24개월 · 계약월 기준",[2,3,4,5,6]],["g-vol","거래량과 금리","",[7,8,9]]];
+const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","서울 25개 구 · 최근 24개월 · 계약월 기준",[2,3,4,5,6]],["g-vol","거래량·미분양·금리","",[7,10,8,9]]];
 const FULL=new Set([1,4,5]);
 function header(){
   $("#collected").textContent=D.collected+(D.failed?` · 수집 실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=state.gu==="서울 전체"?"서울":state.gu;
