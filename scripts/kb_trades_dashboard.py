@@ -16,6 +16,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(__file__))
 from kb_status import update_status  # noqa: E402
+from trade_regions import PROVINCES, KB_NAMES, districts, normalize_trades, normalize_rone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOW_PRICES = [10000, 15000, 20000]  # 만원: 1억, 1.5억, 2억 (목록에 담는 최대치는 2억)
@@ -27,25 +28,29 @@ def med(xs):
 
 
 def aggregate(tr):
-    """구·월별 건수, 중위 거래가, 중위 ㎡당 가격. 서울 전체도 함께."""
+    """시·군·구, 시·도, 전국 월별 통계. 누락된 지역·월은 0건과 구분한다."""
     months = tr["months"]
     agg = {}
     for kind, by_gu in tr["trades"].items():
         agg[kind] = {}
-        allrows = []
-        for gu, rows in list(by_gu.items()) + [("서울 전체", None)]:
-            rows = allrows if rows is None else rows
-            if gu != "서울 전체":
-                allrows.extend(rows)
+        expected = districts()
+        groups = {g: [g] for ids in expected.values() for g in ids}
+        groups.update(expected)
+        groups['전국'] = [g for ids in expected.values() for g in ids]
+        for gu, members in groups.items():
+            rows = [r for g in members for r in by_gu.get(g, [])]
+            missing = {m for g in members for m in tr.get('missing', {}).get(kind, {}).get(g, [])}
+            if any(g not in by_gu for g in members):
+                missing.update(months)
             bym = {m: [] for m in months}
             for r in rows:
                 m = r[0][:7]
                 if m in bym:
                     bym[m].append(r)
             agg[kind][gu] = {
-                "n": [len(bym[m]) for m in months],
-                "price": [med([r[5] for r in bym[m]]) for m in months],
-                "ppa": [med([r[5] / r[3] for r in bym[m] if r[3]]) for m in months],
+                "n": [None if m in missing else len(bym[m]) for m in months],
+                "price": [None if m in missing else med([r[5] for r in bym[m]]) for m in months],
+                "ppa": [None if m in missing else med([r[5] / r[3] for r in bym[m] if r[3] > 0]) for m in months],
             }
     return agg
 
@@ -64,7 +69,7 @@ def low_price_list(tr, months_n=12):
 
 
 def kb_monthly_series(path):
-    """KB 월간 서울 아파트·연립 중위 매매가(만원) — 실거래 중위가와 비교용."""
+    """KB 월간 전국·시·도 아파트·연립 중위 매매가(만원)."""
     from kb_monthly_extract import main as mextract
     with tempfile.TemporaryDirectory() as tmp:
         js = os.path.join(tmp, "km.json")
@@ -72,7 +77,8 @@ def kb_monthly_series(path):
         m = json.load(open(js, encoding="utf-8"))
     s = m["median_sale"]
     return {"asof": m["asof"], "dates": s["dates"],
-            "apt": s["values"]["서울특별시"]["apt"], "row": s["values"]["서울특별시"]["row"]}
+            "values": {p: s['values'][name] for p, name in {'전국': '전국', **KB_NAMES}.items()
+                       if name in s['values']}}
 
 
 PLACEHOLDER = """<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -103,9 +109,11 @@ def build(fetch=True, drive=False):
         extra_main()
     if not os.path.exists(os.path.join(ROOT, "cache", "trades.json")):
         return write_placeholder()
-    tr = json.load(open(os.path.join(ROOT, "cache", "trades.json"), encoding="utf-8"))
+    tr = normalize_trades(json.load(open(os.path.join(ROOT, "cache", "trades.json"), encoding="utf-8")))
     extra_path = os.path.join(ROOT, "cache", "extra.json")
     extra = json.load(open(extra_path, encoding="utf-8")) if os.path.exists(extra_path) else {}
+    if 'apt_trades' in extra:
+        extra['apt_trades'] = normalize_rone(extra['apt_trades'])
 
     kb = None
     if drive:
@@ -121,7 +129,7 @@ def build(fetch=True, drive=False):
     today = dt.date.today()
     data = {
         "months": tr["months"], "collected": tr["collected"], "failed": tr.get("failed", 0),
-        "gus": list(tr["trades"]["apt"].keys()),
+        "provinces": PROVINCES, "districts": districts(),
         "agg": aggregate(tr), "low": low_price_list(tr),
         "extra": extra, "kb": kb,
         "partial_from": (today.replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m"),

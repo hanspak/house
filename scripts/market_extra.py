@@ -11,10 +11,11 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from trade_regions import normalize_rone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# R-ONE (월) 행정구역별 아파트매매거래현황 — 전국·시도·서울 구
+# R-ONE (월) 행정구역별 아파트매매거래현황 — 전국·시도·시군구
 RONE_APT_TRADES = "A_2024_00554"
 RONE_COUNT_ITEM = 100001  # 동(호)수
 # R-ONE 미분양주택현황 — 시·도 '계'와 시군구. 전국 합계는 없어 시·도 '계'를 더한다.
@@ -73,7 +74,7 @@ def rone_apt_trades(key, start="200601"):
     regions = {}
     for r in latest:
         full = r["CLS_FULLNM"]
-        if r["ITM_ID"] == RONE_COUNT_ITEM and (">" not in full or full.startswith("서울>")):
+        if r["ITM_ID"] == RONE_COUNT_ITEM:
             regions[r["CLS_ID"]] = full
     series = {}
     for cid, name in regions.items():
@@ -81,9 +82,9 @@ def rone_apt_trades(key, start="200601"):
         s = {r["WRTTIME_IDTFR_ID"]: r["DTA_VAL"] for r in rows if r["ITM_ID"] == RONE_COUNT_ITEM}
         series[name] = s
     months = sorted({m for s in series.values() for m in s})
-    return {"months": [f"{m[:4]}-{m[4:]}" for m in months],
+    return normalize_rone({"months": [f"{m[:4]}-{m[4:]}" for m in months],
             "values": {n: [s.get(m) for m in months] for n, s in series.items()},
-            "source": "한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황"}
+            "source": "한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황"})
 
 
 def _last_month(back=1):

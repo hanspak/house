@@ -110,6 +110,10 @@ python3 scripts/kb_drive.py --list                # 드라이브에 있는 KB �
 
 ## 실거래·거래량·금리용 API 키 (`trades.html`)
 
+실거래 화면에서 전국·17개 시·도와 시군구를 선택할 수 있습니다. 금리는 전국 공통 자료입니다. 처음 전국 자료를 수집할 때는 서울만 수집할 때보다 API 요청 수와 시간이 늘어납니다. 이후 실행은 기존 월별 캐시를 재사용합니다. 일부 지역·월의 수집이 실패하면 해당 통계를 비우고 화면에 안내합니다.
+
+로컬 갱신: `python3 scripts/kb_trades_dashboard.py`. 캐시만으로 화면을 다시 생성하려면 `python3 scripts/kb_trades_dashboard.py --no-fetch`를 실행합니다. 실거래 수집 병렬 수는 `python3 scripts/molit_trades.py --workers 4`로 조정할 수 있습니다.
+
 | Secret 이름 | 발급처 | 로컬 파일 키 |
 |---|---|---|
 | `DATA_GO_KR_KEY` | 공공데이터포털 일반 인증키(**Decoding**). 아파트 매매 상세·연립다세대 매매·오피스텔 매매 실거래 API 활용 신청 필요 | `data_go_kr` |

@@ -21,7 +21,9 @@ house/
 │  ├─ kb_monthly_extract.py      # 월간 주택·오피스텔 엑셀 → JSON 추출 (+구조 점검)
 │  ├─ kb_monthly_dashboard.py    # 월간 주택 시장판 HTML 생성 (--drive 지원)
 │  ├─ monthly_template.html      # 월간 주택 시장판 화면 템플릿
-│  ├─ molit_trades.py            # 국토부 실거래가 API: 서울 25개 구 아파트·연립다세대·오피스텔 매매 (cache/에 저장)
+│  ├─ molit_trades.py            # 국토부 실거래가 API: 전국 시군구 아파트·연립다세대·오피스텔 매매 (cache/에 저장)
+│  ├─ trade_regions.py           # 전국 시·도/시군구 식별자와 기존 서울 캐시 호환
+│  ├─ trade_regions.json         # 공식 법정동 시군구 수집 코드·통계 권역
 │  ├─ market_extra.py            # 부동산원 R-ONE 아파트 거래량, 한국은행 ECOS 금리 (cache/extra.json)
 │  ├─ kb_trades_dashboard.py     # 실거래·거래량·금리 HTML 생성
 │  ├─ trades_template.html       # 실거래·거래량·금리 화면 템플릿
@@ -41,7 +43,7 @@ house/
 - 매물을 다시 확인하면 YAML의 `최종확인일`·`상태`·`sources[].확인일`을 갱신하고, 가격 등이 바뀌었으면 `변경이력`에 이전 값을 남긴다. `index.csv`도 같이 갱신한다.
 - 저장된 매물 조회는 먼저 `index.csv`로 거르고, 필요하면 개별 YAML을 읽는다.
 - 날짜는 `YYYY-MM-DD`, 가격은 만원 단위 정수(예: 10억 = 100000), 면적은 ㎡로 저장한다. 확인 안 된 값은 `미확인`.
-- 실거래가가 필요하면 `cache/trades.json`(서울 25개 구, 최근 24개월, `python3 scripts/molit_trades.py`로 갱신)을 먼저 확인한다. 이 값은 신고된 **실거래가**이며 호가가 아니다(14장).
+- 실거래가가 필요하면 `cache/trades.json`(전국 시군구, 최근 24개월, `python3 scripts/molit_trades.py`로 갱신)을 먼저 확인한다. 이 값은 신고된 **실거래가**이며 호가가 아니다(14장). `missing`에 기록된 지역·월은 수집 누락이며 거래 0건으로 취급하지 않는다.
 
 ---
 
