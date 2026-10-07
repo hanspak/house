@@ -121,5 +121,43 @@ class RoneTests(unittest.TestCase):
         self.assertEqual(result['values']['인천>중구'], [1, None])
 
 
+class SnapshotTests(unittest.TestCase):
+    def data(self, collected='2026-10-06 01:46 KST'):
+        return {'months': ['2026-09'], 'collected': collected, 'failed': 0,
+                'provinces': PROVINCES, 'districts': districts(),
+                'agg': {k: {p: {'n': [1], 'price': [10000], 'ppa': [200]}
+                            for p in ['전국'] + PROVINCES} for k in collector.TYPES},
+                'low': [], 'extra': {}, 'kb': None, 'partial_from': '2026-09',
+                'type_names': dashboard.TYPE_NAMES}
+
+    def test_snapshot_chooses_latest_complete_data_and_preserves_collection_date(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(dashboard, 'ROOT', tmp), \
+             patch.object(dashboard, 'update_status') as status:
+            tpl = Path(tmp) / 'scripts/trades_template.html'
+            tpl.parent.mkdir()
+            tpl.write_text('const D = /*DATA*/;')
+            dashboard.save_snapshot(self.data(), str(Path(tmp) / 'data/trades.json.gz'))
+            cached = self.data('2026-10-07 08:00 KST')
+            cache_path = str(Path(tmp) / 'cache/published/trades.json.gz')
+            dashboard.save_snapshot(cached, cache_path)
+            page = Path(dashboard.build_snapshot()).read_text()
+            self.assertIn('2026-10-07 08:00 KST', page)
+            status.assert_called_with(trades='2026-10-07')
+            cached['agg']['apt']['전국']['n'] = [None]
+            dashboard.save_snapshot(cached, cache_path)
+            page = Path(dashboard.build_snapshot()).read_text()
+            self.assertIn('2026-10-06 01:46 KST', page)
+            status.assert_called_with(trades='2026-10-06')
+
+    def test_incomplete_snapshot_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self.data()
+            data['failed'] = 1
+            path = str(Path(tmp) / 'trades.json.gz')
+            dashboard.save_snapshot(data, path)
+            with self.assertRaises(SystemExit):
+                dashboard.build_snapshot(path)
+
+
 if __name__ == '__main__':
     unittest.main()

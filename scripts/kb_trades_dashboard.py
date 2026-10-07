@@ -4,10 +4,13 @@
   python3 scripts/kb_trades_dashboard.py            # 실거래·R-ONE·ECOS를 새로 받고 화면 생성
   python3 scripts/kb_trades_dashboard.py --no-fetch # cache/에 있는 자료로만 화면 생성
   python3 scripts/kb_trades_dashboard.py --drive    # KB 월간 파일을 드라이브에서 받음(호가 비교용)
+  python3 scripts/kb_trades_dashboard.py --snapshot # 마지막 완전한 전국 집계로 즉시 화면 생성
 
 결과: dashboard/trades.html
 """
 import datetime as dt
+import argparse
+import gzip
 import json
 import os
 import statistics
@@ -135,7 +138,43 @@ def build(fetch=True, drive=False):
         "partial_from": (today.replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m"),
         "type_names": TYPE_NAMES,
     }
-    tpl = open(os.path.join(ROOT, "scripts", "trades_template.html"), encoding="utf-8").read()
+    if not data['failed']:
+        save_snapshot(data, os.path.join(ROOT, 'cache', 'published', 'trades.json.gz'))
+    return render(data)
+
+
+def save_snapshot(data, path):
+    """게시용 집계 자료만 저장한다. API 키와 원본 응답은 포함하지 않는다."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    with open(path + '.part', 'wb') as f:
+        f.write(gzip.compress(payload, mtime=0))
+    os.replace(path + '.part', path)
+
+
+def build_snapshot(path=None):
+    """수집을 기다리지 않고 마지막 완전한 전국 자료로 현재 템플릿을 렌더링한다."""
+    paths = [path] if path else [os.path.join(ROOT, 'data', 'trades.json.gz'),
+                                os.path.join(ROOT, 'cache', 'published', 'trades.json.gz')]
+    candidates = []
+    for candidate in paths:
+        if not os.path.exists(candidate):
+            continue
+        with gzip.open(candidate, 'rt', encoding='utf-8') as f:
+            data = json.load(f)
+        if data.get('failed') or data.get('provinces') != PROVINCES:
+            continue
+        if any(v is None for kind in data['agg'].values() for series in kind.values() for v in series['n']):
+            continue
+        candidates.append(data)
+    if not candidates:
+        raise SystemExit('게시 가능한 전국 집계 자료가 없습니다.')
+    return render(max(candidates, key=lambda d: d['collected']))
+
+
+def render(data):
+    with open(os.path.join(ROOT, "scripts", "trades_template.html"), encoding="utf-8") as f:
+        tpl = f.read()
     html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
     os.makedirs(out_dir, exist_ok=True)
@@ -143,9 +182,18 @@ def build(fetch=True, drive=False):
     with open(out, "w", encoding="utf-8") as f:
         f.write('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
                 '<meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + html + "</body></html>")
-    update_status(trades=tr["collected"][:10])
+    update_status(trades=data["collected"][:10])
     print(f"생성: {out} ({os.path.getsize(out) / 1e6:.1f}MB, 1억~2억 이하 목록 {len(data['low'])}건)")
+    return out
 
 
 if __name__ == "__main__":
-    build(fetch="--no-fetch" not in sys.argv[1:], drive="--drive" in sys.argv[1:])
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--no-fetch', action='store_true')
+    parser.add_argument('--drive', action='store_true')
+    parser.add_argument('--snapshot', action='store_true', help='마지막 완전한 집계 자료로 빠르게 화면 생성')
+    args = parser.parse_args()
+    if args.snapshot:
+        build_snapshot()
+    else:
+        build(fetch=not args.no_fetch, drive=args.drive)

@@ -112,6 +112,10 @@ python3 scripts/kb_drive.py --list                # 드라이브에 있는 KB �
 
 실거래 화면에서 전국·17개 시·도와 시군구를 선택할 수 있습니다. 금리는 전국 공통 자료입니다. 처음 전국 자료를 수집할 때는 서울만 수집할 때보다 API 요청 수와 시간이 늘어납니다. 이후 실행은 기존 월별 캐시를 재사용합니다. 일부 지역·월의 수집이 실패하면 해당 통계를 비우고 화면에 안내합니다.
 
+페이지 배포는 `data/trades.json.gz` 또는 Actions 캐시에 있는 마지막 완전한 전국 집계 자료로 즉시 화면을 만듭니다(`python3 scripts/kb_trades_dashboard.py --snapshot`). 이 파일은 화면에 표시되는 공개 통계·소액 거래 목록만 포함하며 인증키와 원본 API 응답은 포함하지 않습니다. 수집일은 원래 날짜를 유지합니다. 매일 예약 실행 및 수동 실행에서는 배포 완료 후 별도 `refresh` 작업으로 실거래를 최대 35분 갱신하고, 중단돼도 월별 캐시를 보존합니다. 완전한 집계가 저장되면 다음 배포에 반영됩니다. 코드 푸시는 수집을 기다리지 않고 배포합니다.
+
+게시용 기본 자료를 교체하려면 로컬에서 완전한 전국 수집을 완료하고 `python3 scripts/kb_trades_dashboard.py --no-fetch`로 집계한 뒤 `cache/published/trades.json.gz`를 `data/trades.json.gz`로 복사해 커밋합니다.
+
 로컬 갱신: `python3 scripts/kb_trades_dashboard.py`. 캐시만으로 화면을 다시 생성하려면 `python3 scripts/kb_trades_dashboard.py --no-fetch`를 실행합니다. 실거래 수집 병렬 수는 `python3 scripts/molit_trades.py --workers 4`로 조정할 수 있습니다.
 
 | Secret 이름 | 발급처 | 로컬 파일 키 |

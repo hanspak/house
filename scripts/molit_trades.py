@@ -74,14 +74,17 @@ def fetch(key, kind, lawd, ym):
     while True:
         q = urllib.parse.urlencode({"serviceKey": key, "LAWD_CD": lawd, "DEAL_YMD": ym, "pageNo": page, "numOfRows": 1000})
         url = f"https://apis.data.go.kr/1613000/{svc}/{op}?{q}"
-        for attempt in range(6):
+        attempts = int(os.environ.get('MOLIT_API_ATTEMPTS', '6'))
+        if not 1 <= attempts <= 6:
+            raise ValueError('MOLIT_API_ATTEMPTS는 1~6이어야 합니다')
+        for attempt in range(attempts):
             try:
                 pace(kind)
                 body = urllib.request.urlopen(url, timeout=40).read().decode("utf-8")
                 root = ET.fromstring(body)
                 break
             except Exception as e:
-                if attempt == 5:
+                if attempt == attempts - 1:
                     raise
                 # 429(요청 과다)는 길게 쉬었다가 다시 시도
                 time.sleep((10 if "429" in str(e) else 2) * (attempt + 1))

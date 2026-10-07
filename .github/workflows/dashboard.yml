@@ -3,7 +3,7 @@
 # 자료가 오래되면(주간 14일, 월간 2개월 초과) 배포는 하되 마지막 'freshness' 작업을 실패시켜 메일 알림을 받는다.
 #   trades.html  = 실거래·거래량·금리 (국토부 실거래가, 부동산원 R-ONE, 한국은행 ECOS)
 # 필요한 저장소 Secrets: KB_SA_KEY_JSON (서비스 계정 키 JSON 전체), KB_DRIVE_FOLDER_ID,
-#                        DATA_GO_KR_KEY, RONE_KEY, ECOS_KEY (없으면 trades.html은 안내 페이지)
+#                        DATA_GO_KR_KEY, RONE_KEY, ECOS_KEY (별도 데이터 갱신 작업에서 사용)
 name: 국면판 갱신
 
 on:
@@ -15,6 +15,7 @@ on:
     paths:
       - "scripts/**"
       - "tests/**"
+      - "data/**"
       - ".github/workflows/dashboard.yml"
 
 permissions:
@@ -64,21 +65,15 @@ jobs:
           KB_DRIVE_FOLDER_ID: ${{ secrets.KB_DRIVE_FOLDER_ID }}
         run: python scripts/kb_monthly_dashboard.py --drive
 
-      # 실거래 응답 캐시: 지난 달들은 다시 받지 않도록 실행 사이에 보관 (최근 3개월만 매번 새로 받음)
-      - name: 실거래 캐시 복원
-        uses: actions/cache@v4
+      - name: 마지막 게시용 실거래 자료 복원
+        uses: actions/cache/restore@v4
         with:
-          path: cache/molit
-          key: molit-${{ github.run_id }}
-          restore-keys: molit-
+          path: cache/published
+          key: trades-published-${{ github.run_id }}
+          restore-keys: trades-published-
 
-      - name: 실거래·거래량·금리 생성
-        env:
-          KB_DRIVE_FOLDER_ID: ${{ secrets.KB_DRIVE_FOLDER_ID }}
-          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
-          RONE_KEY: ${{ secrets.RONE_KEY }}
-          ECOS_KEY: ${{ secrets.ECOS_KEY }}
-        run: python scripts/kb_trades_dashboard.py --drive
+      - name: 전국 실거래 화면 생성
+        run: python scripts/kb_trades_dashboard.py --snapshot
 
       - name: 자료 기준일 점검
         id: fresh
@@ -120,3 +115,71 @@ jobs:
         run: |
           echo "::error::${{ needs.build.outputs.message }}"
           exit 1
+
+  refresh:
+    # 수집 실패·시간 초과가 화면 게시를 막지 않도록 배포 완료 후 갱신한다.
+    needs: deploy
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            cache/molit
+            cache/published
+          key: molit-${{ github.run_id }}
+          restore-keys: molit-
+
+      - name: 전국 실거래 갱신 (최대 35분)
+        id: collect
+        continue-on-error: true
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          MOLIT_API_ATTEMPTS: "2"
+        run: timeout --signal=TERM 35m python -u scripts/molit_trades.py --workers 12
+
+      - name: 거래량·미분양·금리 갱신 (최대 5분)
+        if: steps.collect.outcome == 'success'
+        env:
+          RONE_KEY: ${{ secrets.RONE_KEY }}
+          ECOS_KEY: ${{ secrets.ECOS_KEY }}
+        run: timeout --signal=TERM 5m python -u scripts/market_extra.py
+
+      - name: 완전한 전국 자료를 게시용 집계로 저장
+        if: steps.collect.outcome == 'success'
+        env:
+          KB_SA_KEY_JSON: ${{ secrets.KB_SA_KEY_JSON }}
+          KB_DRIVE_FOLDER_ID: ${{ secrets.KB_DRIVE_FOLDER_ID }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$KB_SA_KEY_JSON" > secrets/kb-drive-sa.json
+          chmod 600 secrets/kb-drive-sa.json
+          python scripts/kb_trades_dashboard.py --no-fetch --drive
+
+      - name: 키 파일 삭제
+        if: always()
+        run: rm -f secrets/kb-drive-sa.json
+
+      - name: 수집한 월별 캐시 보존
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            cache/molit
+            cache/published
+          key: molit-${{ github.run_id }}
+
+      - name: 다음 배포용 집계 자료 보존
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache/published
+          key: trades-published-${{ github.run_id }}
