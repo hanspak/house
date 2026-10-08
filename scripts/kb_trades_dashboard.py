@@ -23,6 +23,7 @@ from trade_regions import PROVINCES, KB_NAMES, districts, normalize_trades, norm
 from trade_analysis import (aggregate_profiles, trade_recovery, source_dates,
                             ANALYSIS_VERSION, MIN_PRICE_SAMPLE, AREA_OPTIONS, AGE_OPTIONS)
 from overview_data import save as save_overview
+from data_revisions import save_published
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOW_PRICES = [10000, 15000, 20000]  # 만원: 1억, 1.5억, 2억 (목록에 담는 최대치는 2억)
@@ -127,11 +128,7 @@ def build(fetch=True, drive=False):
 
 def save_snapshot(data, path):
     """게시용 집계 자료만 저장한다. API 키와 원본 응답은 포함하지 않는다."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    with open(path + '.part', 'wb') as f:
-        f.write(gzip.compress(payload, mtime=0))
-    os.replace(path + '.part', path)
+    save_published('trades', data, path, os.path.join(ROOT, 'data', 'trades.json.gz'))
 
 
 def build_snapshot(path=None):
@@ -155,8 +152,9 @@ def build_snapshot(path=None):
 
 
 def render(data):
-    save_overview('trades', {k: data[k] for k in ('months', 'collected', 'partial_from', 'agg', 'extra', 'recovery', 'sources') if k in data}, ROOT)
+    save_overview('trades', {k: data[k] for k in ('months', 'collected', 'partial_from', 'agg', 'extra', 'recovery', 'sources', 'revision_history') if k in data}, ROOT)
     data = dict(data)
+    data.pop('revision_history', None)  # 이력은 종합 화면의 별도 JSON에서만 읽는다.
     profiles = data.pop('profiles', {})
     out_dir = os.path.join(ROOT, 'dashboard')
     asset_dir = os.path.join(out_dir, 'trades-data')

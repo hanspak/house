@@ -2,6 +2,8 @@
 import argparse
 import fcntl
 import json
+import hashlib
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -71,9 +73,18 @@ def publish(root, timeout=600):
                     if f'name="build-commit" content="{sha}"' in get(page + '?v=' + sha):
                         if (root / 'scripts/market_overview.py').exists():
                             overview = page.replace('trades.html', 'overview.html')
-                            if f'name="build-commit" content="{sha}"' not in get(overview + '?v=' + sha):
+                            page_html = get(overview + '?v=' + sha)
+                            if f'name="build-commit" content="{sha}"' not in page_html:
                                 time.sleep(20)
                                 continue
+                            match = re.search(r'"revision_file":"(overview-data/revisions\.([a-f0-9]{12})\.json)"', page_html)
+                            if not match and (root / 'scripts/data_revisions.py').exists():
+                                raise SystemExit('공개 종합 화면에 변경 이력 파일 연결이 없습니다.')
+                            if match:
+                                body = get(overview.rsplit('/', 1)[0] + '/' + match[1])
+                                if hashlib.sha256(body.encode()).hexdigest()[:12] != match[2] or json.loads(body).get('schema_version') != 1:
+                                    raise SystemExit('변경 이력 파일의 공개 내용이 예상과 다릅니다.')
+                                print('변경 이력 파일 게시 확인', flush=True)
                             print(f'종합 화면 게시 확인: {overview}', flush=True)
                         print(f'게시 확인: {page}\n커밋: {sha}\nActions: {workflow["html_url"]}', flush=True)
                         if any(j['name'] == 'freshness' and j['conclusion'] == 'failure' for j in jobs):

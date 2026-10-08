@@ -1,6 +1,7 @@
 """지역별 가격·거래·임대차·공급·구매부담을 공통 형식으로 묶는다."""
 import datetime as dt
 import gzip
+import hashlib
 import json
 import math
 import os
@@ -148,7 +149,25 @@ def build():
     def read(kind):
         with (ROOT / 'dashboard/overview-input' / (kind + '.json')).open(encoding='utf-8') as f:
             return json.load(f)
-    data = summarize(read('weekly'), read('monthly'), read('trades'), load_feed('supply'), load_feed('rents'))
+    trades, supply, rents = read('trades'), load_feed('supply'), load_feed('rents')
+    data = summarize(read('weekly'), read('monthly'), trades, supply, rents)
+    revisions = {'schema_version': 1, 'sources': {}}
+    data['revision_sources'] = []
+    for kind, label, feed in [('trades', '국토부 매매', trades), ('supply', '공식 미분양', supply), ('rents', '아파트 전월세', rents)]:
+        info = feed.get('revision_history', {}) if feed else {}
+        revisions['sources'][kind] = info
+        data['revision_sources'].append({'kind': kind, 'name': label, 'tracking_since': info.get('tracking_since'),
+                                         'last_collected': feed.get('collected') if feed else None,
+                                         'last_checked': info.get('last_checked'), 'events': len(info.get('events', [])),
+                                         'dropped_events': info.get('dropped_events', 0), 'dropped_changes': info.get('dropped_changes', 0)})
+    payload = json.dumps(revisions, ensure_ascii=False, separators=(',', ':')).encode()
+    filename = 'revisions.' + hashlib.sha256(payload).hexdigest()[:12] + '.json'
+    folder = ROOT / 'dashboard/overview-data'
+    folder.mkdir(parents=True, exist_ok=True)
+    part = folder / (filename + '.part')
+    part.write_bytes(payload)
+    part.replace(folder / filename)
+    data['revision_file'] = 'overview-data/' + filename
     template = (ROOT / 'scripts/overview_template.html').read_text(encoding='utf-8')
     html = template.replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
     html = html.replace('/*BUILD_SHA*/', os.environ.get('GITHUB_SHA', 'local'))

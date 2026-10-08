@@ -1,6 +1,5 @@
 """국토부 공식 미분양 엑셀에서 전체·준공 후 미분양을 함께 추출한다."""
 import datetime as dt
-import gzip
 import json
 from pathlib import Path
 import re
@@ -8,6 +7,7 @@ import urllib.parse
 import urllib.request
 import openpyxl
 
+from data_revisions import save_published
 from trade_regions import PROVINCES, districts
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -100,10 +100,7 @@ def collect(limit=6):
             'collected': dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M KST'),
             'values': {key: {kind: [periods[m][kind].get(key) for m in months] for kind in ('total', 'completed')} for key in keys}}
     dest = ROOT / 'cache/published/housing/supply.json.gz'
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    part = dest.with_suffix('.part')
-    part.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode(), mtime=0))
-    part.replace(dest)
+    save_published('supply', data, dest, ROOT / 'data/supply.json.gz')
     return data
 
 

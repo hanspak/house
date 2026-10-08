@@ -23,6 +23,14 @@ nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}na
 <div class="table-wrap"><table id="compare"></table></div>
 <h2>공급·임대차 추이</h2><p class="note">공급은 국토부 공식 미분양, 임대차는 신고된 아파트 계약 기준입니다. 표본 10건 미만의 가격은 비우며 최근 2개월 전월세는 집계 중입니다. 계약 건수 아래 신규·갱신·미확인 건수를 구분합니다.</p>
 <div class="grid"><div class="table-wrap"><table id="supply-trend"></table></div><div class="table-wrap"><table id="rent-trend"></table></div></div>
+<section id="revisions"><h2>자료 변경 이력</h2>
+<p class="note">같은 지역·같은 월의 집계가 수집 사이에 달라진 기록입니다. 신고 추가·해제·정정 등 원인을 구분하지 않으며 새 월의 첫 발표는 변경 건수에 포함하지 않습니다. 매매 전체 조건·전월세·공식 미분양을 추적합니다.</p>
+<div class="controls"><label for="revision-source">자료</label><select id="revision-source"><option value="all">전체</option><option value="trades">국토부 매매</option><option value="supply">공식 미분양</option><option value="rents">아파트 전월세</option></select><button id="load-revisions" type="button">선택 지역 이력 확인</button><button id="revision-csv" type="button" disabled>선택 지역 이력 CSV</button></div>
+<p id="revision-status" class="note" role="status" aria-live="polite"></p>
+<div class="table-wrap"><table id="revision-table"></table></div>
+<div class="actions"><button id="revision-more" type="button" hidden>변경 기록 더 보기</button></div>
+<p class="note">자료별 최근 변경 수집 12회·변경 값 최대 20,000개를 보존합니다. 그 이전 이력은 제공하지 않습니다. 전국·시도·시군구 합계가 함께 바뀔 수 있으므로 변경 값 건수는 개별 계약 건수가 아닙니다.</p>
+</section>
 <section class="source"><h2>자료 기준일</h2><p class="note">수집일과 자료 기준기간은 다릅니다. 전체 자료의 최신 기간이며, 개별 지역은 카드에 표시된 기간을 확인하세요.</p><div class="table-wrap"><table id="sources"></table></div></section>
 </main><script>
 const D=/*DATA*/;
@@ -49,13 +57,30 @@ function render(){
  $('#compare').querySelectorAll('button').forEach(b=>b.onclick=()=>select(b.dataset.region));
  const supply=D.supply?.values[state.region];$('#supply-trend').innerHTML='<thead><tr><th>월</th><th>전체 미분양</th><th>준공 후</th></tr></thead><tbody>'+(supply?D.supply.months.map((m,i)=>'<tr><td>'+m+'</td><td>'+esc(format({value:supply.total[i],unit:'호'}))+'</td><td>'+esc(format({value:supply.completed[i],unit:'호'}))+'</td></tr>').join(''):'<tr><td colspan="3">선택 지역의 공급 자료 없음</td></tr>')+'</tbody>';
  const rent=D.rents?.values[state.region];const rentDate=D.sources.find(s=>s.name==='국토부 전월세')?.collected;const rentMonth=rentDate?rentDate.slice(0,7):null;const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));$('#rent-trend').innerHTML='<thead><tr><th>월</th><th>계약</th><th>전세 중위 보증금</th><th>월세 중위액</th></tr></thead><tbody>'+(rent?D.rents.months.map((m,i)=>'<tr><td>'+m+(rentMonth&&serial(m)>=serial(rentMonth)-1?' · 집계 중':'')+'</td><td>'+esc(valid(rent.n[i])?rent.n[i].toLocaleString()+'건':'–')+(valid(rent.n[i])?'<small>신규 '+esc(rent.new_n[i])+' · 갱신 '+esc(rent.renewal_n[i])+' · 미확인 '+esc(rent.unknown_n[i])+'</small>':'')+'</td><td>'+esc(format({value:rent.deposit[i],unit:'만원'}))+'</td><td>'+esc(format({value:rent.rent[i],unit:'만원/월'}))+'</td></tr>').join(''):'<tr><td colspan="4">선택 지역의 임대차 자료 없음</td></tr>')+'</tbody>';
+ renderRevisions();
  const kb=D.kb_names[province]||'전국';$('#details').innerHTML=`<a href="index.html#view=${encodeURIComponent(kb)}">주간 권역 상세</a><a href="monthly.html#region=${encodeURIComponent(kb)}">월간 권역 상세</a><a href="trades.html#gu=${encodeURIComponent(state.region)}">실거래 상세</a>`;
  $('#sources').innerHTML='<thead><tr><th>자료</th><th>최신 기간</th><th>수집일</th></tr></thead><tbody>'+D.sources.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.period||'–')+'</td><td>'+esc(s.collected||'기록 없음')+'</td></tr>').join('')+'</tbody>';
  try{localStorage.setItem('house-overview',JSON.stringify(state));}catch{}
  history.replaceState(null,'','#'+new URLSearchParams({region:state.region,watch:state.watch.join(',')}));
 }
+let revisionData=null,revisionLoading=null,revisionLimit=20;
+const revisionRows=()=>{if(!revisionData)return [];const kind=$('#revision-source').value,rows=[];for(const source of D.revision_sources){if(kind!=='all'&&kind!==source.kind)continue;for(const event of revisionData.sources[source.kind]?.events||[])for(const change of event.changes)if(change.region===state.region)rows.push({...change,source:source.name,before_collected:event.before_collected,after_collected:event.after_collected,observed_at:event.observed_at});}return rows.sort((a,b)=>b.observed_at.localeCompare(a.observed_at)||b.month.localeCompare(a.month));};
+function revisionValue(value,unit){return valid(value)?value.toLocaleString(undefined,{maximumFractionDigits:2})+(unit||''):'–';}
+function renderRevisions(){
+ const kind=$('#revision-source').value,sources=D.revision_sources.filter(s=>kind==='all'||kind===s.kind),rows=revisionRows();
+ const basis=sources.map(s=>s.name+'：'+(s.tracking_since?'추적 시작 '+s.tracking_since:'추적 미등록')+' · 수집 '+(s.last_collected||'없음')).join(' / ');
+ const limited=sources.some(s=>s.dropped_events||s.dropped_changes);
+ $('#revision-status').textContent=basis+(revisionData?' · '+label(state.region)+'의 보존된 변경 값 '+rows.length+'개'+(rows.length?'':' · 아직 비교 수집에서 확인된 변경이 없습니다.'):' · 버튼을 누르면 이력을 읽습니다.')+(limited?' · 보존 한도 때문에 일부 과거 기록이 생략되었습니다.':'');
+ $('#revision-table').innerHTML='<thead><tr><th>수집 전 → 후</th><th>자료·유형</th><th>기준월</th><th>지표</th><th>이전</th><th>현재</th><th>차이</th><th>구분</th></tr></thead><tbody>'+rows.slice(0,revisionLimit).map(r=>'<tr><td>'+esc(r.before_collected)+'<small>→ '+esc(r.after_collected)+'</small></td><td>'+esc(r.source)+'<small>'+esc(r.category)+'</small></td><td>'+esc(r.month)+'</td><td>'+esc(r.metric)+'</td><td>'+esc(revisionValue(r.before,r.unit))+'</td><td>'+esc(revisionValue(r.after,r.unit))+'</td><td>'+esc(valid(r.delta)?(r.delta>0?'+':'')+revisionValue(r.delta,r.unit):'–')+'</td><td>'+esc(r.status)+'</td></tr>').join('')+(rows.length?'':'<tr><td colspan="8">'+(revisionData?'선택 지역의 보존된 변경 기록이 없습니다.':'이력을 아직 읽지 않았습니다.')+'</td></tr>')+'</tbody>';
+ $('#revision-more').hidden=rows.length<=revisionLimit;$('#revision-csv').disabled=!rows.length;
+}
+$('#load-revisions').onclick=async()=>{const button=$('#load-revisions');button.disabled=true;$('#revision-status').textContent='변경 이력을 읽고 있습니다.';try{if(!revisionData){if(!revisionLoading)revisionLoading=fetch(D.revision_file).then(response=>{if(!response.ok)throw Error('HTTP');return response.json();}).then(data=>{if(data.schema_version!==1||!data.sources)throw Error('schema');return data;});revisionData=await revisionLoading;}revisionLimit=20;renderRevisions();}catch{revisionLoading=null;$('#revision-status').textContent='변경 이력을 읽지 못했습니다. 이력 확인 버튼으로 다시 시도하세요.';}finally{button.disabled=false;}};
+$('#revision-source').onchange=()=>{revisionLimit=20;renderRevisions();};
+$('#revision-more').onclick=()=>{revisionLimit+=20;renderRevisions();};
+$('#revision-csv').onclick=()=>{const rows=[['지역','자료','유형','기준월','지표','단위','이전','현재','차이','구분','이전 수집일','현재 수집일','확인일']];for(const r of revisionRows())rows.push([label(r.region),r.source,r.category,r.month,r.metric,r.unit,r.before??'',r.after??'',r.delta??'',r.status,r.before_collected,r.after_collected,r.observed_at]);downloadCSV(rows,'자료변경이력.csv');};
+function downloadCSV(rows,name){const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('#star').onclick=()=>{if(state.watch.includes(state.region))state.watch=state.watch.filter(r=>r!==state.region);else if(state.watch.length>=6){$('#status').textContent='관심 지역은 최대 6곳입니다. 기존 지역을 해제한 뒤 추가하세요.';return;}else state.watch.push(state.region);$('#status').textContent='관심 지역을 저장했습니다.';render();};
 $('#share').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('#status').textContent='선택 조건과 관심 지역 링크를 복사했습니다.';}catch{$('#status').textContent='주소창의 링크를 복사해 공유할 수 있습니다.';}};
-$('#csv').onclick=()=>{const rows=[['지역','지표','값','단위','기간','권역','설명']];for(const r of state.watch.length?state.watch:[state.region])for(const [key,title] of definitions){const m=D.metrics[r][key];rows.push([label(r),title,m.value??'',m.unit,m.period??'',m.scope??'',m.note]);}const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='관심지역_시장지표.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('#csv').onclick=()=>{const rows=[['지역','지표','값','단위','기간','권역','설명']];for(const r of state.watch.length?state.watch:[state.region])for(const [key,title] of definitions){const m=D.metrics[r][key];rows.push([label(r),title,m.value??'',m.unit,m.period??'',m.scope??'',m.note]);}downloadCSV(rows,'관심지역_시장지표.csv');};
 render();
 </script></body></html>

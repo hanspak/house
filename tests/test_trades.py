@@ -1,5 +1,6 @@
 """전국 실거래 집계·누락·코드 개편·기존 캐시 회귀 검사. 외부 API를 호출하지 않는다."""
 import copy
+import gzip
 import json
 from pathlib import Path
 import sys
@@ -145,7 +146,9 @@ class SnapshotTests(unittest.TestCase):
             self.assertIn('2026-10-07 08:00 KST', page)
             status.assert_called_with(trades='2026-10-07')
             cached['agg']['apt']['전국']['n'] = [None]
-            dashboard.save_snapshot(cached, cache_path)
+            with self.assertRaises(ValueError):
+                dashboard.save_snapshot(cached, cache_path)
+            Path(cache_path).write_bytes(gzip.compress(json.dumps(cached).encode()))
             page = Path(dashboard.build_snapshot()).read_text()
             self.assertIn('2026-10-06 01:46 KST', page)
             status.assert_called_with(trades='2026-10-06')
@@ -155,7 +158,9 @@ class SnapshotTests(unittest.TestCase):
             data = self.data()
             data['failed'] = 1
             path = str(Path(tmp) / 'trades.json.gz')
-            dashboard.save_snapshot(data, path)
+            with self.assertRaises(ValueError):
+                dashboard.save_snapshot(data, path)
+            Path(path).write_bytes(gzip.compress(json.dumps(data).encode()))
             with self.assertRaises(SystemExit):
                 dashboard.build_snapshot(path)
 
@@ -176,12 +181,16 @@ class SnapshotTests(unittest.TestCase):
             tpl.write_text('const D = /*DATA*/;')
             data = self.data()
             data['profiles'] = {'small-new': data['agg']}
+            data['revision_history'] = {'events': []}
             page = Path(dashboard.render(data)).read_text()
             assets = list((Path(tmp) / 'dashboard/trades-data').glob('small-new.*.json'))
             self.assertEqual(len(assets), 1)
             self.assertEqual(json.loads(assets[0].read_text()), data['agg'])
             self.assertIn('trades-data/' + assets[0].name, page)
             self.assertNotIn('"profiles":', page)
+            self.assertNotIn('"revision_history":', page)
+            exported = json.loads((Path(tmp) / 'dashboard/overview-input/trades.json').read_text())
+            self.assertEqual(exported['revision_history'], {'events': []})
 
 
 if __name__ == '__main__':

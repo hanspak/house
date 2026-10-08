@@ -3,7 +3,6 @@ import argparse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import datetime as dt
-import gzip
 import json
 from pathlib import Path
 import statistics
@@ -13,6 +12,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 from molit_trades import api_key, months_back, pace
+from data_revisions import save_published
 from trade_regions import REGIONS, districts, region_id
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,10 +134,7 @@ def collect(months=6, workers=8):
     dest.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')))
     if not failures:
         dest = ROOT / 'cache/published/housing/rents.json.gz'
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        part = dest.with_suffix('.part')
-        part.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode(), mtime=0))
-        part.replace(dest)
+        save_published('rents', data, dest, ROOT / 'data/rents.json.gz')
     print(f'전월세 집계 완료 · 실패 {failures} · 완전한 자료만 게시용으로 보존', flush=True)
     return data
 
