@@ -144,3 +144,10 @@ node --test tests/market_analysis.test.cjs tests/overview_comparison.test.cjs
 ```sh
 node --test tests/market_analysis.test.cjs tests/overview_comparison.test.cjs tests/profile_loader.test.cjs
 ```
+
+
+## 실거래 지역 비교 내보내기
+
+지역별 비교표는 전국 선택 시 17개 시도, 시도·시군구 선택 시 해당 시도의 시군구를 표시한다. 선택 유형·면적·연식과 현재 정렬을 CSV에도 적용한다. 최근 3개 완결월과 전년 같은 3개월의 실제 거래를 합친 중위값을 사용하며 월 중위값의 평균을 만들지 않는다.
+
+표에는 양쪽 기간의 ㎡당 가격 표본과 비교 상태를 표시한다. 지역 비교 CSV에는 두 기간·거래 건수·가격/㎡당 표본·중위값·증감률·보류 사유·수집일을 담는다. 수집 누락·표본 부족·전년 0건의 비율은 빈 값으로 내보내고 사유를 구분한다. 지역 크기·단지·층·입지 구성은 보정하지 않는다. 기존 월별 CSV와 같은 인코딩·다운로드 함수를 사용한다.

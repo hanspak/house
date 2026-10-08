@@ -323,15 +323,41 @@ def(3,"선택 유형 ㎡당 중위 거래가","실제 거래된 가격은 오르
   const f=document.createElement("p");f.className="finding";f.innerHTML=`${p3label} ㎡당 중위 <b>${won(pp)}</b> · 1년 전 같은 기간 ${won(ppp)} (<b>${pct(ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN,1)}</b>). 전용 ${k==="apt"?84:59}㎡로 환산하면 약 ${won(ok(pp)?pp*(k==="apt"?84:59):null)}.`;box.appendChild(f);
 });
 
+// 화면과 CSV는 같은 기간·표본·정렬 결과를 사용한다.
+function comparisonRows(){
+  const end=last3[2],before=prev3.length===3?prev3[2]:-1;
+  const change=(now,old)=>ok(now)&&ok(old)&&old>0?(now/old-1)*100:null;
+  const priceReason=(a,ix,key)=>{
+    if(ix.length!==3)return '비교 기간 부족';
+    const n=sum(a.n,ix),sample=a.period3?.[key][ix[2]];
+    if(!ok(n)||!ok(sample))return '수집 누락';
+    return sample<D.min_price_sample?'표본 '+D.min_price_sample+'건 미만':'';
+  };
+  const rows=compareRegions().map(g=>{
+    const a=AG[state.type][g],pp=periodMedian(a,'ppa',last3),ppp=periodMedian(a,'ppa',prev3),n3=sum(a.n,last3),previous=prev3.length===3?sum(a.n,prev3):null;
+    const reasons=[priceReason(a,last3,'ppa_n'),priceReason(a,prev3,'ppa_n')];
+    const yo=change(pp,ppp);
+    return {g,n3,previous,nchg:change(n3,previous),price:periodMedian(a,'price',last3),pp,ppp,yo,
+      priceN:a.period3?.price_n[end],ppaN:a.period3?.ppa_n[end],previousPriceN:a.period3?.price_n[before],previousPpaN:a.period3?.ppa_n[before],
+      priceStatus:priceReason(a,last3,'price_n'),volumeStatus:!ok(n3)||!ok(previous)?'수집 누락':previous===0?'전년 거래 0건으로 증감률 보류':'',
+      status:reasons.map((r,i)=>r?(i?'전년: ':'최근: ')+r:'').filter(Boolean).join(' · ')||(ok(yo)?'비교 가능':'전년 가격 0 또는 가격 결측으로 비교 보류')};
+  });
+  const key=state.sort4||'yo';return rows.sort((a,b)=>(ok(b[key])?b[key]:-Infinity)-(ok(a[key])?a[key]:-Infinity));
+}
 def(4,"지역별 비교","어느 지역에서 거래가 많고, 실거래가가 많이 올랐나",true,(box)=>{
-  const k=state.type,rows=compareRegions().map(g=>{const a=AG[k][g],pp=periodMedian(a,"ppa",last3),ppp=prev3.length===3?periodMedian(a,"ppa",prev3):null,n3=sum(a.n,last3),n3p=prev3.length===3?sum(a.n,prev3):null;
-    return {g,n3,nchg:ok(n3)&&n3p?(n3/n3p-1)*100:NaN,price:periodMedian(a,"price",last3),pp,yo:ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN};});
-  const key=state.sort4||"yo";rows.sort((a,b)=>((ok(b[key])?b[key]:-1e9)-(ok(a[key])?a[key]:-1e9)));
+  const k=state.type,rows=comparisonRows(),key=state.sort4||"yo";
   box.innerHTML=`<div class="card-head"><p class="sub" style="margin:0">${TN[k]} · ${p3label} 합계·중위 vs 1년 전 같은 3개월 · 줄을 누르면 해당 지역으로 전환</p>
-  <div class="ctl"><label for="f-sort4">정렬</label><select id="f-sort4"><option value="yo">㎡당 가격 상승률</option><option value="pp">㎡당 가격</option><option value="n3">거래 건수</option><option value="nchg">거래 증가율</option></select></div></div>
-  <div class="tbl" style="margin-top:8px"><table><thead><tr><th>지역</th><th>거래 건수</th><th>건수 증감</th><th>중위 거래가</th><th>㎡당 중위</th><th>㎡당 전년비</th></tr></thead><tbody>${
-    rows.map(r=>`<tr data-g="${r.g}" class="${r.g===state.gu?"on":""}"><td>${regionLabel(r.g)}</td><td>${count(r.n3)}</td><td class="${cls(r.nchg)}">${pct(r.nchg,0)}</td><td>${won(r.price)}</td><td>${won(r.pp)}</td><td class="${cls(r.yo)}">${pct(r.yo,1)}</td></tr>`).join("")}</tbody></table></div>`;
+  <div class="ctl"><label for="f-sort4">정렬</label><select id="f-sort4"><option value="yo">㎡당 가격 상승률</option><option value="pp">㎡당 가격</option><option value="n3">거래 건수</option><option value="nchg">거래 증가율</option></select><button id="trade-compare-csv" type="button">지역 비교 CSV</button></div></div>
+  <p class="sub" style="margin-top:8px">㎡당 표본은 실제 3개월 거래를 합친 건수(최근 / 전년)입니다. 각 기간 ${D.min_price_sample}건 이상일 때 가격을 표시합니다. 단지·층·입지 구성과 지역 규모 차이는 보정하지 않습니다.</p>
+  <div class="tbl"><table><thead><tr><th>지역</th><th>거래 건수</th><th>건수 증감</th><th>중위 거래가</th><th>㎡당 중위</th><th>㎡당 전년비</th><th>㎡당 표본 (최근 / 전년)</th><th>㎡당 비교 상태</th></tr></thead><tbody>${
+    rows.map(r=>`<tr data-g="${r.g}" class="${r.g===state.gu?"on":""}"><td>${regionLabel(r.g)}</td><td>${count(r.n3)}</td><td class="${cls(r.nchg)}">${pct(r.nchg,0)}</td><td>${won(r.price)}</td><td>${won(r.pp)}</td><td class="${cls(r.yo)}">${pct(r.yo,1)}</td><td>${count(r.ppaN)} / ${count(r.previousPpaN)}</td><td>${r.status}</td></tr>`).join("")}</tbody></table></div>`;
   $("#f-sort4").value=key;$("#f-sort4").onchange=e=>{state.sort4=e.target.value;render();};
+  $('#trade-compare-csv').onclick=()=>{
+    if(activeProfile!==profileKey())return;
+    const rows=[['지역','유형','면적 조건','연식 조건','연식 기준연도','최근 기간','전년 기간','거래 건수','전년 거래 건수','거래 증감률(%)','최근 가격 표본','전년 가격 표본','최근 ㎡당 표본','전년 ㎡당 표본','중위 거래가(만원)','㎡당 중위(만원/㎡)','전년 ㎡당 중위(만원/㎡)','㎡당 전년비(%)','중위 거래가 보류 사유','거래 증감 보류 사유','㎡당 비교 상태','수집일']];
+    comparisonRows().forEach(r=>rows.push([regionLabel(r.g),TN[k],D.filters.area[state.area],D.filters.age[state.age],D.filters.year,p3label,prev3.length===3?MS[prev3[0]]+'~'+MS[prev3[2]]:'',r.n3,r.previous,r.nchg,r.priceN,r.previousPriceN,r.ppaN,r.previousPpaN,r.price,r.pp,r.ppp,r.yo,r.priceStatus,r.volumeStatus,r.status,D.collected]));
+    downloadCSV(rows,'실거래_지역비교.csv');$('#trade-action-status').textContent='현재 정렬 순서의 지역 비교표를 내려받았습니다. 결측·표본 부족·전년 0건은 수치와 보류 사유를 구분합니다.';
+  };
   box.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=goGu(tr.dataset.g));
 });
 
@@ -486,12 +512,16 @@ function render(){
 }
 $('#trade-retry').onclick=()=>render();
 $('#trade-share').onclick=async()=>{save();const link=location.href;try{await navigator.clipboard.writeText(link);$('#trade-share-url').hidden=true;$('#trade-action-status').textContent='선택 조건 링크를 복사했습니다.';}catch(e){const input=$('#trade-share-url');input.value=link;input.hidden=false;input.focus();input.select();$('#trade-action-status').textContent='공유 주소를 직접 복사하세요.';}};
+function downloadCSV(rows,filename){
+ const encode=v=>'"'+String(v==null||typeof v==='number'&&!Number.isFinite(v)?'':v).replace(/"/g,'""')+'"';
+ const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 $('#trade-csv').onclick=()=>{
  if(activeProfile!==profileKey()||$('#trade-csv').disabled)return;
  const a=AG[state.type][state.gu],price=monthlyPrice(a,'price'),ppa=monthlyPrice(a,'ppa');
  const rows=[['지역','유형','면적 조건','연식 조건','연식 기준연도','계약월','집계 상태','거래 건수','가격 표본','㎡당 가격 표본','중위 거래가(만원)','㎡당 중위(만원/㎡)','하위25% 거래가(만원)','상위25% 거래가(만원)','수집일']];
  MS.forEach((m,i)=>rows.push([regionLabel(state.gu),TN[state.type],D.filters.area[state.area],D.filters.age[state.age],D.filters.year,m,!ok(a.n[i])?'수집 누락'+(partial(m)?' · 집계 중':''):partial(m)?'집계 중':'신고 지연·정정 가능',a.n[i]??'',a.price_n[i]??'',a.ppa_n[i]??'',price[i]??'',ppa[i]??'',a.price_n[i]>=D.min_price_sample?a.q1[i]??'':'',a.price_n[i]>=D.min_price_sample?a.q3[i]??'':'',D.collected]));
- const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='실거래_월별집계.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ downloadCSV(rows,'실거래_월별집계.csv');
  $('#trade-action-status').textContent='선택 조건의 월별 집계를 내려받았습니다. 가격 표본 10건 미만은 가격·분포를 비워 둡니다.';
 };
 
