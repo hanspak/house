@@ -24,7 +24,7 @@ nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}na
 <h2>공급·임대차 추이</h2><p class="note">공급은 국토부 공식 미분양, 임대차는 신고된 아파트 계약 기준입니다. 표본 10건 미만의 가격은 비우며 최근 2개월 전월세는 집계 중입니다. 계약 건수 아래 신규·갱신·미확인 건수를 구분합니다.</p>
 <div class="grid"><div class="table-wrap"><table id="supply-trend"></table></div><div class="table-wrap"><table id="rent-trend"></table></div></div>
 <section id="revisions"><h2>자료 변경 이력</h2>
-<p class="note">같은 지역·같은 월의 집계가 수집 사이에 달라진 기록입니다. 신고 추가·해제·정정 등 원인을 구분하지 않으며 새 월의 첫 발표는 변경 건수에 포함하지 않습니다. 매매 전체 조건·전월세·공식 미분양을 추적합니다.</p>
+<p class="note">같은 지역·같은 월의 집계가 수집 사이에 달라진 기록입니다. 신고 추가·해제·정정 등 원인을 구분하지 않으며 새 월의 첫 발표는 변경 건수에 포함하지 않습니다. 매매 전체 조건·전월세·공식 미분양을 추적합니다. 매매·전월세는 재조회하는 최근 3개월 중심이며 미분양은 최근 6개월을 다시 읽습니다.</p>
 <div class="controls"><label for="revision-source">자료</label><select id="revision-source"><option value="all">전체</option><option value="trades">국토부 매매</option><option value="supply">공식 미분양</option><option value="rents">아파트 전월세</option></select><button id="load-revisions" type="button">선택 지역 이력 확인</button><button id="revision-csv" type="button" disabled>선택 지역 이력 CSV</button></div>
 <p id="revision-status" class="note" role="status" aria-live="polite"></p>
 <div class="table-wrap"><table id="revision-table"></table></div>

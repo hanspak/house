@@ -1,4 +1,5 @@
 from pathlib import Path
+import io
 import sys
 import tempfile
 import unittest
@@ -58,6 +59,26 @@ class SupplyTests(unittest.TestCase):
             with self.assertRaises(ValueError):housing_supply.parse_workbook(path,'2026-08')
             self.workbook(path,total=341)
             with self.assertRaises(ValueError):housing_supply.parse_workbook(path,'2026-08')
+
+    def test_collection_rereads_existing_month_for_official_revisions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cached = root / 'cache/supply/202608.xlsx'
+            cached.parent.mkdir(parents=True)
+            self.workbook(cached)
+            fresh = root / 'fresh.xlsx'
+            self.workbook(fresh, total=357)
+            book = openpyxl.load_workbook(fresh)
+            for row in book['공사완료후★'].iter_rows(min_row=6):
+                row[2].value = 21
+            book.save(fresh);book.close()
+            html = "downFile('미분양주택현황(2026년8월).xlsx','revised.xlsx','/stat_file/'"
+            replies = [io.BytesIO(html.encode()), io.BytesIO(fresh.read_bytes())]
+            with patch.object(housing_supply, 'ROOT', root), patch.object(housing_supply.urllib.request, 'urlopen', side_effect=replies) as request:
+                data = housing_supply.collect(limit=1)
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual(data['values']['전국']['completed'], [357])
+            self.assertEqual(housing_supply.parse_workbook(cached, '2026-08')['completed']['전국'], 357)
 
     def test_merged_region_maps_districts_without_duplicate_total(self):
         self.assertEqual(housing_supply.region_key('전남광주','동 구'),'광주|동구')

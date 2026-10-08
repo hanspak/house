@@ -83,15 +83,15 @@ def collect(limit=6):
     periods = {}
     for month in sorted(files, reverse=True)[:limit]:
         path = ROOT / 'cache/supply' / (month.replace('-', '') + '.xlsx')
-        if not path.exists():
-            query = urllib.parse.urlencode(dict(zip(('oFileName', 'rFileName', 'midpath'), files[month])))
-            url = 'https://stat.molit.go.kr/portal/common/downLoadFile.do?' + query
-            with urllib.request.urlopen(url, timeout=30) as response:
-                body = response.read()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            part = path.with_suffix('.part')
-            part.write_bytes(body)
-            part.replace(path)
+        # 같은 월의 첨부 파일도 정정될 수 있어 추적 범위 6개월을 다시 읽는다.
+        query = urllib.parse.urlencode(dict(zip(('oFileName', 'rFileName', 'midpath'), files[month])))
+        url = 'https://stat.molit.go.kr/portal/common/downLoadFile.do?' + query
+        with urllib.request.urlopen(url, timeout=30) as response:
+            body = response.read()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        part = path.with_suffix('.part')
+        part.write_bytes(body)
+        part.replace(path)
         periods[month] = parse_workbook(path, month)
         print('공식 미분양 추출:', month, flush=True)
     months = sorted(periods)
