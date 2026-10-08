@@ -1,6 +1,7 @@
 """커밋된 작업을 검사하고 main에 통합·push한 뒤 실제 Pages 게시를 확인한다."""
 import argparse
 import fcntl
+import http.client
 import json
 import hashlib
 import re
@@ -10,6 +11,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 
 
 def run(root, *args, capture=False):
@@ -22,10 +24,34 @@ def git(root, *args):
     return run(root, 'git', *args, capture=True)
 
 
-def get(url):
+def get(url, deadline=None):
     req = urllib.request.Request(url, headers={'User-Agent': 'house-publish-check', 'Cache-Control': 'no-cache'})
-    with urllib.request.urlopen(req, timeout=40) as response:
-        return response.read().decode('utf-8')
+    host = urllib.parse.urlsplit(url).hostname or ''
+    for attempt in range(4):
+        remaining = deadline - time.monotonic() if deadline is not None else float('inf')
+        if remaining <= 0:
+            raise TimeoutError('Publication verification deadline exceeded')
+        delay = 2 ** (attempt + 1)
+        try:
+            with urllib.request.urlopen(req, timeout=min(40, remaining)) as response:
+                return response.read().decode('utf-8')
+        except urllib.error.HTTPError as error:
+            retryable = error.code in (408, 429, 500, 502, 503, 504) or (error.code == 404 and host.endswith('.github.io'))
+            hint = error.headers.get('Retry-After') if error.headers else None
+            if hint and hint.isdigit():
+                delay = min(15, int(hint))
+            reason = 'HTTP ' + str(error.code)
+            error.close()
+            if not retryable or attempt == 3:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+            reason = type(error).__name__
+            if attempt == 3:
+                raise
+        if deadline is not None and time.monotonic() + delay >= deadline:
+            raise TimeoutError('Publication verification deadline exceeded')
+        print(f'공개 확인 재시도 {attempt + 2}/4 · {host} · {reason} · {delay}초 후', flush=True)
+        time.sleep(delay)
 
 
 def publish(root, timeout=600):
@@ -58,12 +84,14 @@ def publish(root, timeout=600):
         repo = git(root, 'remote', 'get-url', 'origin').removesuffix('.git').split('github.com')[-1].lstrip('/:')
         api = f'https://api.github.com/repos/{repo}/actions/runs?head_sha={sha}&per_page=5'
         end = time.monotonic() + timeout
+        def read(url):
+            return get(url, deadline=end)
         last_state = None
         while time.monotonic() < end:
-            runs = json.loads(get(api))['workflow_runs']
+            runs = json.loads(read(api))['workflow_runs']
             workflow = next((r for r in runs if r['path'].startswith('.github/workflows/dashboard.yml')), None)
             if workflow:
-                jobs = json.loads(get(workflow['jobs_url']))['jobs']
+                jobs = json.loads(read(workflow['jobs_url']))['jobs']
                 states = [(j['name'], j['status'], j['conclusion']) for j in jobs]
                 if states != last_state:
                     print('배포 진행:', states, flush=True)
@@ -71,17 +99,21 @@ def publish(root, timeout=600):
                 deploy = next((j for j in jobs if j['name'] == 'deploy'), None)
                 if deploy and deploy['conclusion'] == 'success':
                     page = f'https://{repo.split("/")[0]}.github.io/{repo.split("/")[1]}/trades.html'
-                    if f'name="build-commit" content="{sha}"' in get(page + '?v=' + sha):
+                    trade_html = read(page + '?v=' + sha)
+                    if f'name="build-commit" content="{sha}"' in trade_html:
+                        loader = (root / 'scripts/profile_loader.js').read_text(encoding='utf-8')
+                        if loader not in trade_html:
+                            raise SystemExit('공개 실거래 화면의 조건 자료 모듈이 예상과 다릅니다.')
                         kb_pages = [page.replace('trades.html', name) for name in ('index.html', 'monthly.html')]
                         analysis = (root / 'scripts/market_analysis.js').read_text(encoding='utf-8')
-                        kb_html = [get(url + '?v=' + sha) for url in kb_pages]
+                        kb_html = [read(url + '?v=' + sha) for url in kb_pages]
                         if any(f'name="build-commit" content="{sha}"' not in html or analysis not in html for html in kb_html):
                             time.sleep(20)
                             continue
                         print('주간·월간 화면 커밋 및 계산 모듈 게시 확인', flush=True)
                         if (root / 'scripts/market_overview.py').exists():
                             overview = page.replace('trades.html', 'overview.html')
-                            page_html = get(overview + '?v=' + sha)
+                            page_html = read(overview + '?v=' + sha)
                             if f'name="build-commit" content="{sha}"' not in page_html:
                                 time.sleep(20)
                                 continue
@@ -92,7 +124,7 @@ def publish(root, timeout=600):
                             if not match and (root / 'scripts/data_revisions.py').exists():
                                 raise SystemExit('공개 종합 화면에 변경 이력 파일 연결이 없습니다.')
                             if match:
-                                body = get(overview.rsplit('/', 1)[0] + '/' + match[1])
+                                body = read(overview.rsplit('/', 1)[0] + '/' + match[1])
                                 if hashlib.sha256(body.encode()).hexdigest()[:12] != match[2] or json.loads(body).get('schema_version') != 1:
                                     raise SystemExit('변경 이력 파일의 공개 내용이 예상과 다릅니다.')
                                 print('변경 이력 파일 게시 확인', flush=True)
@@ -113,5 +145,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     try:
         publish(Path(__file__).resolve().parents[1], args.timeout)
-    except (subprocess.CalledProcessError, urllib.error.URLError, BlockingIOError) as error:
-        raise SystemExit(f'자동 배포 중단: {type(error).__name__}. 로그의 Git/배포 상태를 확인하세요.')
+    except (subprocess.CalledProcessError, urllib.error.URLError, BlockingIOError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+        reason = 'HTTP ' + str(error.code) if isinstance(error, urllib.error.HTTPError) else type(error).__name__
+        raise SystemExit(f'자동 배포 중단: {reason}. 로그의 Git/배포 상태를 확인하세요.')
