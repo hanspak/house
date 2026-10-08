@@ -16,6 +16,7 @@ on:
       - "scripts/**"
       - "tests/**"
       - "data/**"
+      - "docs/**"
       - ".github/workflows/dashboard.yml"
 
 permissions:

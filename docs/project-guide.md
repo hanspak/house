@@ -169,3 +169,5 @@ node --test tests/market_analysis.test.cjs tests/overview_comparison.test.cjs te
 ## 임대차 추이 표본·CSV
 
 종합 임대차 표는 전세/월세 가격 표본·보류 사유, 확인 계약 중 갱신 및 전체 중 미확인 비중을 제공한다. rentRows()가 화면과 CSV 수치를 함께 만든다. CSV는 6개월 계약·가격·표본·구분 건수·비중·잠정/누락 상태·수집일을 담고 원계약은 제외한다. 10건 미만 가격·0분모 비중은 비우고 실제 0건은 보존한다. 자료가 없으면 CSV 버튼을 비활성화한다. 산식은 indicators.md에 있다.
+
+문서 전용 커밋도 자동 게시의 커밋 확인과 일치하도록 Actions push 대상에 docs/**를 포함한다.
