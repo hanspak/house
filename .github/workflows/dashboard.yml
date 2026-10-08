@@ -203,7 +203,7 @@ jobs:
     needs: deploy
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -222,6 +222,12 @@ jobs:
       - name: 공식 미분양 갱신 (최대 5분)
         continue-on-error: true
         run: timeout --signal=TERM 5m python -u scripts/housing_supply.py
+      - name: 아파트 공급 단계 갱신 (최대 5분)
+        continue-on-error: true
+        run: timeout --signal=TERM 5m python -u scripts/housing_pipeline.py
+      - name: 공동주택 입주예정 갱신 (최대 2분)
+        continue-on-error: true
+        run: timeout --signal=TERM 2m python -u scripts/housing_moveins.py
       - name: 전국 전월세 갱신 (최대 20분)
         continue-on-error: true
         env:

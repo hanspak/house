@@ -70,3 +70,21 @@ python3 scripts/market_overview.py
 수집 캐시와 기본 `data/*.json.gz` 중 최신 호환 집계가 기준이다. 내용이 바뀌지 않은 재생성은 변경 이벤트를 만들지 않는다. 원거래·키는 이력에 포함하지 않는다. 현재 기본 파일은 이력 추적의 시작 기준만 등록했고 실제 변경은 후속 수집부터 누적한다.
 
 종합 생성기는 `dashboard/overview-data/revisions.<내용해시>.json`을 함께 만든다. Pages artifact에 `overview-data/`도 포함해야 한다. 자동 배포 명령은 공개 HTML뿐 아니라 이력 JSON의 해시 일치까지 확인한다. 이력은 자료별 최근 변경 수집 12회·변경 값 20,000개 한도이며 영구 원자료 감사 저장소가 아니다.
+
+## 공급 실적·입주예정 연결
+
+- `housing_pipeline.py`: 인증키 없이 국토부 공식 인허가·착공·준공 최근 6개월 XLS를 다시 읽는다. `xlrd`로 아파트 월계·기준월·전국 합계를 점검한다. 공표 권역 변경은 원래 권역으로 유지한다.
+- `housing_moveins.py`: 공공데이터포털 공식 다운로드 조회로 최신 CSV를 받아 항목·전체 행 수·전망 범위를 점검한다. 예정월 미정과 주소 연결 실패를 별도로 보존한다. 포털 메타데이터 `contentUrl`은 다른 첨부를 가리킬 수 있어 실제 다운로드 버튼의 조회 경로를 사용한다.
+- 공개 기본 자료: `data/pipeline.json.gz`, `data/moveins.json.gz`. 공급 단계·지역·월 집계만 담고 개별 단지명·주소는 공개 집계에 넣지 않는다. 원본은 로컬 `cache/pipeline/`, `cache/moveins/`에 둔다.
+- `housing` Actions에 두 수집기를 추가했다. 기존 캐시 복원 경로를 유지해 전월세 월별 캐시와 변경 이력을 잃지 않도록 했다. 새 공개 집계도 같은 `cache/published/housing/`에 보존하고 다음 배포가 읽는다. raw XLS/CSV는 매번 다시 읽으므로 별도 Actions 캐시를 요구하지 않는다.
+
+```sh
+python3 -m pip install -r requirements.txt
+python3 scripts/housing_pipeline.py
+python3 scripts/housing_moveins.py
+cp cache/published/housing/pipeline.json.gz data/pipeline.json.gz
+cp cache/published/housing/moveins.json.gz data/moveins.json.gz
+python3 scripts/market_overview.py
+```
+
+기준일이 다른 실적·전망을 한 지표로 합산하지 않는다. 실제 입주 확인·신고 자료가 추가되면 별도 공급원을 만들고 정의와 공표 범위를 구분한다.

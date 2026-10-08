@@ -10,6 +10,8 @@ EVENT_LIMIT = 12
 CHANGE_LIMIT = 20000
 TYPE_NAMES = {'apt': '아파트', 'rh': '연립·다세대', 'offi': '오피스텔'}
 FIELDS = {
+    'moveins': [('scheduled', '입주예정(월 기재)', '호')],
+    'pipeline': [('permit', '아파트 인허가', '호'), ('start', '아파트 착공', '호'), ('completion', '아파트 준공', '호')],
     'supply': [('total', '전체 미분양', '호'), ('completed', '준공 후 미분양', '호')],
     'rents': [('n', '전월세 계약', '건'), ('jeonse_n', '전세 계약', '건'),
               ('monthly_n', '월세 계약', '건'), ('deposit', '전세 중위 보증금', '만원'),
@@ -64,6 +66,10 @@ def cells(kind, data):
                         if i >= len(samples) or not finite(samples[i]) or samples[i] < data.get('min_price_sample', 10):
                             value = None
                     result[(region, data['months'][i], category, field)] = (value if finite(value) else None, label, unit)
+            if kind == 'moveins':
+                for year in {m[:4] for m in data['months']}:
+                    value = series.get('unscheduled', {}).get(year, 0) if series.get('district_available', True) else None
+                    result[(region, year + '-00', category, 'unscheduled')] = (value, '입주예정(월 미정)', '호')
     return result
 
 
