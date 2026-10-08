@@ -41,7 +41,7 @@ def publish(root, timeout=600):
                 raise SystemExit(f'{folder}: 미커밋 변경이 있습니다. 담당 변경을 먼저 커밋하세요.')
         if git(integration, 'branch', '--show-current') != 'main':
             raise SystemExit('통합 폴더가 main이 아닙니다. 브랜치를 자동 변경하지 않습니다.')
-        run(root, 'node', '--test', 'tests/market_analysis.test.cjs')
+        run(root, 'node', '--test', 'tests/market_analysis.test.cjs', 'tests/overview_comparison.test.cjs')
         run(root, 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-v')
         run(root, 'python3', '-B', 'scripts/kb_trades_dashboard.py', '--snapshot')
         if (root / 'scripts/market_overview.py').exists():
@@ -85,6 +85,9 @@ def publish(root, timeout=600):
                             if f'name="build-commit" content="{sha}"' not in page_html:
                                 time.sleep(20)
                                 continue
+                            comparison = (root / 'scripts/overview_comparison.js').read_text(encoding='utf-8')
+                            if comparison not in page_html:
+                                raise SystemExit('공개 종합 화면의 비교 계산 모듈이 예상과 다릅니다.')
                             match = re.search(r'"revision_file":"(overview-data/revisions\.([a-f0-9]{12})\.json)"', page_html)
                             if not match and (root / 'scripts/data_revisions.py').exists():
                                 raise SystemExit('공개 종합 화면에 변경 이력 파일 연결이 없습니다.')

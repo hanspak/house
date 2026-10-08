@@ -174,7 +174,7 @@ def summarize(weekly, monthly, trades, supply=None, rents=None, pipeline=None, m
             'metrics': result, 'sources': [
                 {'name': 'KB 주간', 'kind': 'weekly', 'period': weekly.get('asof'), 'collected': None},
                 {'name': 'KB 월간', 'kind': 'kb_monthly', 'period': monthly.get('asof'), 'collected': None}
-            ] + [s for s in trades.get('sources', []) if s['name'] != 'KB 월간'] + [
+            ] + [{**s, 'name': 'R-ONE 미분양' if s['name'] == '미분양' else s['name']} for s in trades.get('sources', []) if s['name'] != 'KB 월간'] + [
                 {'name': name, 'kind': 'forecast' if name == '공동주택 입주예정' else 'monthly',
                  'asof': feed.get('asof') if feed else None,
                  'horizon_start': feed['months'][0] if feed else None,
@@ -216,7 +216,8 @@ def build():
     part.replace(folder / filename)
     data['revision_file'] = 'overview-data/' + filename
     template = (ROOT / 'scripts/overview_template.html').read_text(encoding='utf-8')
-    html = template.replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
+    comparison = (ROOT / 'scripts/overview_comparison.js').read_text(encoding='utf-8')
+    html = template.replace('/*COMPARISON*/', comparison).replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
     html = html.replace('/*BUILD_SHA*/', os.environ.get('GITHUB_SHA', 'local'))
     out = ROOT / 'dashboard/overview.html'
     out.write_text(html, encoding='utf-8')

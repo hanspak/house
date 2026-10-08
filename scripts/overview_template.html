@@ -21,6 +21,9 @@ nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}na
 <p class="note">붉은색·푸른색은 가격 변동의 방향입니다. 수익성이나 안전성을 뜻하지 않습니다. 전세가율은 지역 통계로 개별 매물의 보증금 안전성을 판정할 수 없습니다. 월세 중위액은 보증금·면적·연식 구성을 보정하지 않았습니다.</p>
 <div class="actions" id="details"></div>
 <h2>관심 지역 비교</h2><p class="note">각 값 아래 기준기간을 표시합니다. 시군구 지표가 없으면 상위 지역 자료임을 표시합니다. 관심 지역은 이 브라우저에 저장되며 최대 6곳입니다.</p>
+<div class="controls" aria-label="지역 비교 설정"><label for="compare-preset">지표 묶음</label><select id="compare-preset"><option value="market">시장 흐름</option><option value="rental">임대차·구매 부담</option><option value="supply">공급·입주</option><option value="custom">직접 선택</option></select><label for="compare-base">기준 지역</label><select id="compare-base"></select><label><input id="compare-delta" type="checkbox"> 기준 지역 대비 차이 표시</label><button id="compare-csv" type="button">지역 비교 CSV</button></div>
+<details id="compare-picker"><summary>비교 지표 직접 선택 (최대 6개)</summary><div id="compare-columns" class="controls"></div></details>
+<p id="compare-note" class="note" role="status" aria-live="polite"></p>
 <div class="table-wrap"><table id="compare"></table></div>
 <section id="supply-planning"><h2>공급 단계·입주예정</h2>
 <p class="note">인허가·착공·준공은 아파트 월계 실적입니다. 각 단계는 같은 사업 집단이 아니므로 합계·차이를 미래 입주량으로 보지 않습니다. 입주예정은 30세대 이상 공동주택의 기준 시점 추정치로, 실제 입주와 다르며 일정이 바뀔 수 있습니다.</p>
@@ -42,13 +45,15 @@ nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}na
 </section>
 <section class="source" id="source-status"><h2>자료 기준일·갱신 점검</h2><p id="health-policy" class="note"></p><button id="source-csv" type="button">자료 상태 CSV</button><p class="note">수집일과 자료 기준기간은 다릅니다. 전체 자료의 최신 기간이며, 개별 지역은 카드에 표시된 기간을 확인하세요.</p><div class="table-wrap"><table id="sources"></table></div></section>
 </main><script>
+/*COMPARISON*/
 const D=/*DATA*/;
 const $=s=>document.querySelector(s),valid=v=>typeof v==='number'&&Number.isFinite(v),label=r=>r.replace('|',' ');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const definitions=[['price','매매지수 최근 4주'],['jeonse','전세지수 최근 4주'],['recovery','아파트 거래 회복률'],['trade_price','최근 3개월 실거래 중위'],['completed','준공 후 미분양'],['supply_share','미분양 중 준공 후 비중'],['rent_deposit','전세 보증금 중위'],['monthly_rent','월세 중위액'],['jeonse_ratio','KB 전세가율'],['hai','주택구매력지수 HAI'],['rate','주택담보대출 금리'],['permit','아파트 인허가(월)'],['start','아파트 착공(월)'],['completion','아파트 준공(월)'],['moveins6','향후 6개월 예정(월 기재)'],['moveins12','향후 12개월 예정(월 기재)'],['moveins_unknown','입주예정 월 미정']];
 let state={region:'전국',watch:['서울','경기','부산']};
-try{const saved=JSON.parse(localStorage.getItem('house-overview')||'{}');if(D.regions.includes(saved.region))state.region=saved.region;if(Array.isArray(saved.watch))state.watch=saved.watch;}catch{}
+try{const saved=JSON.parse(localStorage.getItem('house-overview')||'{}');if(D.regions.includes(saved.region))state.region=saved.region;if(Array.isArray(saved.watch))state.watch=saved.watch;state.compareColumns=saved.compareColumns;state.compareBase=saved.compareBase;state.compareDelta=saved.compareDelta;}catch{}
 const hash=new URLSearchParams(location.hash.slice(1));if(D.regions.includes(hash.get('region')))state.region=hash.get('region');if(hash.has('watch'))state.watch=hash.get('watch').split(',');
+if(hash.has('cols'))state.compareColumns=hash.get('cols').split(',');if(hash.has('base'))state.compareBase=hash.get('base');if(hash.has('delta'))state.compareDelta=hash.get('delta')==='1';
 state.watch=[...new Set(state.watch)].filter(r=>D.regions.includes(r)).slice(0,6);
 function format(m,key){if(!valid(m?.value))return '–';if(m.unit==='만원')return m.value>=10000?(m.value/10000).toFixed(2)+'억':Math.round(m.value).toLocaleString()+'만';if(m.unit==='호')return Math.round(m.value).toLocaleString()+'호';const sign=['price','jeonse'].includes(key)&&m.value>0?'+':'';return sign+m.value.toLocaleString(undefined,{maximumFractionDigits:2})+m.unit;}
 function select(region){state.region=region;render();}
@@ -61,9 +66,7 @@ function render(){
  const metrics=D.metrics[state.region];
  $('#cards').innerHTML=definitions.map(([key,title])=>{const m=metrics[key];const color=['price','jeonse'].includes(key)&&valid(m.value)?(m.value>0?'up':m.value<0?'down':''):'';return `<article class="card"><h3>${title}</h3><div class="value ${color}">${esc(format(m,key))}</div><div class="period">${esc(m.period||'자료 없음')}</div><div class="scope">${esc(m.scope?label(m.scope):'권역 자료 없음')}</div><p>${esc(m.note)}</p></article>`;}).join('');
  const parts=[];for(const [key,title] of [['price','매매'],['jeonse','전세']]){const v=metrics[key].value;parts.push(valid(v)?`${title}지수는 최근 4주 ${v>0?'상승':v<0?'하락':'보합'}입니다.`:`${title}지수 자료가 없습니다.`);}const r=metrics.recovery.value;parts.push(valid(r)?`아파트 거래량은 과거 동기간 평균의 ${r.toFixed(1)}%입니다.`:'거래 회복률을 계산할 자료가 부족합니다.');parts.push('가격·거래·공급 자료의 기간을 함께 확인하세요.');$('#finding').textContent=parts.join(' ');
- const rows=state.watch.length?state.watch:[state.region],cols=['price','jeonse','recovery','completed','jeonse_ratio','moveins12'];
- $('#compare').innerHTML='<thead><tr><th>지역</th>'+cols.map(k=>'<th>'+definitions.find(x=>x[0]===k)[1]+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td><button data-region="'+esc(r)+'">'+esc(label(r))+'</button></td>'+cols.map(k=>{const m=D.metrics[r][k];return '<td>'+esc(format(m,k))+'<small>'+esc(m.period||'자료 없음')+(m.scope&&m.scope!==r&&m.scope!==D.kb_names[r]?' · '+esc(m.scope):'')+'</small></td>';}).join('')+'</tr>').join('')+'</tbody>';
- $('#compare').querySelectorAll('button').forEach(b=>b.onclick=()=>select(b.dataset.region));
+ renderComparison();
  const supply=D.supply?.values[state.region];$('#supply-trend').innerHTML='<thead><tr><th>월</th><th>전체 미분양</th><th>준공 후</th></tr></thead><tbody>'+(supply?D.supply.months.map((m,i)=>'<tr><td>'+m+'</td><td>'+esc(format({value:supply.total[i],unit:'호'}))+'</td><td>'+esc(format({value:supply.completed[i],unit:'호'}))+'</td></tr>').join(''):'<tr><td colspan="3">선택 지역의 공급 자료 없음</td></tr>')+'</tbody>';
  const rent=D.rents?.values[state.region];const rentDate=D.sources.find(s=>s.name==='국토부 전월세')?.collected;const rentMonth=rentDate?rentDate.slice(0,7):null;const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));$('#rent-trend').innerHTML='<thead><tr><th>월</th><th>계약</th><th>전세 중위 보증금</th><th>월세 중위액</th></tr></thead><tbody>'+(rent?D.rents.months.map((m,i)=>'<tr><td>'+m+(rentMonth&&serial(m)>=serial(rentMonth)-1?' · 집계 중':'')+'</td><td>'+esc(valid(rent.n[i])?rent.n[i].toLocaleString()+'건':'–')+(valid(rent.n[i])?'<small>신규 '+esc(rent.new_n[i])+' · 갱신 '+esc(rent.renewal_n[i])+' · 미확인 '+esc(rent.unknown_n[i])+'</small>':'')+'</td><td>'+esc(format({value:rent.deposit[i],unit:'만원'}))+'</td><td>'+esc(format({value:rent.rent[i],unit:'만원/월'}))+'</td></tr>').join(''):'<tr><td colspan="4">선택 지역의 임대차 자료 없음</td></tr>')+'</tbody>';
  renderPlanning();
@@ -71,8 +74,33 @@ function render(){
  const kb=D.kb_names[province]||'전국';$('#details').innerHTML=`<a href="index.html#view=${encodeURIComponent(kb)}">주간 권역 상세</a><a href="monthly.html#region=${encodeURIComponent(kb)}">월간 권역 상세</a><a href="trades.html#gu=${encodeURIComponent(state.region)}">실거래 상세</a>`;
  renderHealth();
  try{localStorage.setItem('house-overview',JSON.stringify(state));}catch{}
- history.replaceState(null,'','#'+new URLSearchParams({region:state.region,watch:state.watch.join(',')}));
+ history.replaceState(null,'','#'+new URLSearchParams({region:state.region,watch:state.watch.join(','),cols:state.compareColumns.join(','),base:state.compareBase,delta:state.compareDelta?'1':'0'}));
 }
+const comparePresets={market:['price','jeonse','recovery','completed','jeonse_ratio','moveins12'],rental:['rent_deposit','monthly_rent','jeonse_ratio','hai','rate','trade_price'],supply:['permit','start','completion','completed','moveins12','moveins_unknown']};
+state.compareColumns=Array.isArray(state.compareColumns)?[...new Set(state.compareColumns)].filter(k=>definitions.some(d=>d[0]===k)).slice(0,6):[];
+if(!state.compareColumns.length)state.compareColumns=[...comparePresets.market];
+state.compareDelta=state.compareDelta===true;
+const comparisonRegions=()=>state.watch.length?state.watch:[state.region];
+const compareDifference=(r,key)=>OverviewComparison.difference(r,D.metrics[r][key],state.compareBase,D.metrics[state.compareBase][key],key,D.kb_names);
+const deltaText=d=>valid(d.delta)?(d.delta>0?'+':'')+d.delta.toLocaleString(undefined,{maximumFractionDigits:2})+d.unit:'– · '+d.reason;
+function renderComparison(){
+ const rows=comparisonRegions(),cols=state.compareColumns;
+ if(!rows.includes(state.compareBase))state.compareBase=rows[0];
+ $('#compare-base').innerHTML=rows.map(r=>'<option value="'+esc(r)+'">'+esc(label(r))+'</option>').join('');$('#compare-base').value=state.compareBase;
+ $('#compare-delta').checked=state.compareDelta;
+ $('#compare-preset').value=Object.keys(comparePresets).find(k=>JSON.stringify(comparePresets[k])===JSON.stringify(cols))||'custom';
+ $('#compare-columns').innerHTML=definitions.map(([k,title])=>'<label><input type="checkbox" value="'+k+'" '+(cols.includes(k)?'checked':'')+'> '+esc(title)+'</label>').join('');
+ $('#compare-columns').querySelectorAll('input').forEach(input=>input.onchange=()=>{const next=input.checked?[...state.compareColumns,input.value]:state.compareColumns.filter(k=>k!==input.value);if(!next.length||next.length>6){input.checked=!input.checked;$('#compare-note').textContent='비교 지표는 1~6개를 선택하세요.';return;}state.compareColumns=next;render();});
+ const mixed=cols.filter(key=>new Set(rows.map(r=>D.metrics[r][key].period).filter(Boolean)).size>1);
+ const held=state.compareDelta?rows.flatMap(r=>cols.map(key=>compareDifference(r,key))).filter(d=>d.delta===null).length:0;
+ $('#compare-note').textContent=(mixed.length?'지역별 기준기간이 다른 지표: '+mixed.map(k=>definitions.find(d=>d[0]===k)[1]).join(', ')+'. ':'')+(state.compareDelta?'기준: '+label(state.compareBase)+' · 값의 차이는 동일 기간·단위·해당 지역 권역일 때 표시합니다. '+(held?held+'개 셀의 차이 계산 보류. ':''):'')+'% 지표의 차이는 %p입니다. 물량 차이는 지역 규모를 보정하지 않은 값이며, 금리는 전국 공통입니다. 비교 CSV에는 차이와 보류 사유를 함께 넣습니다.';
+ $('#compare').innerHTML='<thead><tr><th>지역</th>'+cols.map(k=>'<th>'+definitions.find(x=>x[0]===k)[1]+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td><button data-region="'+esc(r)+'">'+esc(label(r))+'</button>'+(r===state.compareBase?'<small>기준 지역</small>':'')+'</td>'+cols.map(k=>{const m=D.metrics[r][k];return '<td>'+esc(format(m,k))+'<small>'+esc(m.period||'자료 없음')+(m.scope&&m.scope!==r&&m.scope!==D.kb_names[r]?' · '+esc(m.scope):'')+'</small>'+(state.compareDelta?'<small>'+esc(deltaText(compareDifference(r,k)))+'</small>':'')+'</td>';}).join('')+'</tr>').join('')+'</tbody>';
+ $('#compare').querySelectorAll('button').forEach(b=>b.onclick=()=>select(b.dataset.region));
+}
+$('#compare-preset').onchange=()=>{if(comparePresets[$('#compare-preset').value]){state.compareColumns=[...comparePresets[$('#compare-preset').value]];render();}else $('#compare-picker').open=true;};
+$('#compare-base').onchange=()=>{state.compareBase=$('#compare-base').value;render();};
+$('#compare-delta').onchange=()=>{state.compareDelta=$('#compare-delta').checked;render();};
+$('#compare-csv').onclick=()=>{const rows=[['지역','지표','값','단위','기간','권역','기준 지역','기준 값','기준 기간','기준 권역','차이','차이 단위','차이 보류 사유']];for(const r of comparisonRegions())for(const key of state.compareColumns){const m=D.metrics[r][key],base=D.metrics[state.compareBase][key],d=compareDifference(r,key);rows.push([label(r),definitions.find(x=>x[0]===key)[1],m.value??'',m.unit,m.period||'',m.scope||'',label(state.compareBase),base.value??'',base.period||'',base.scope||'',d.delta??'',d.unit,d.reason]);}downloadCSV(rows,'지역비교.csv');};
 function renderHealth(){
  const issues=D.sources.filter(s=>s.health.status==='review');
  $('#data-health').innerHTML='<strong>자료 점검 · '+esc(D.health.checked_on)+' KST</strong><p>'+(issues.length?'확인이 필요한 자료 '+issues.length+'개: '+issues.map(s=>esc(s.name)).join(', '):'모든 자료가 화면의 점검 기준 이내입니다.')+'</p><a href="#source-status">자료별 기준기간·수집일·확인 방법 보기</a>';
