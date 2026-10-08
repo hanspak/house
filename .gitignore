@@ -12,3 +12,8 @@ secrets/
 
 # API 응답 캐시
 cache/
+
+# Claude/Codex 독립 작업 폴더와 로컬 IDE 파일
+.worktrees/
+claude.code-workspace
+codex.code-workspace
