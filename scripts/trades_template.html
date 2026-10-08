@@ -152,6 +152,8 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
   <div class="ctl"><label for="f-age">연식</label><select id="f-age"></select></div>
 </div>
 <p class="note" id="filter-status"></p>
+<div class="controls" aria-label="선택 조건 내보내기"><button id="trade-share" type="button">선택 조건 링크 복사</button><button id="trade-csv" type="button" disabled>선택 조건 월별 CSV</button><button id="trade-retry" type="button" hidden>조건 자료 다시 읽기</button><input id="trade-share-url" type="text" readonly hidden aria-label="직접 복사할 공유 주소" style="width:100%;min-width:0"></div>
+<p class="note" id="trade-action-status" role="status" aria-live="polite"></p>
 <div id="source-status" class="tbl"></div>
 <p class="note" id="data-status" role="status"></p>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
@@ -219,10 +221,13 @@ function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fi
 const TN=D.type_names, MS=D.months, EX=D.extra||{};
 let AG=D.agg;
 const profileCache=new Map([["all-all",D.agg]]);
-let renderId=0;
+let renderId=0,activeProfile="all-all";
 const state={gu:"전국",type:"rh",low:10000,lowType:"rh",area:"all",age:"all"};
 try{Object.assign(state,JSON.parse(localStorage.getItem("kb-trades")||"{}"));}catch(e){}
-const hg=new URLSearchParams(location.hash.slice(1)).get("gu");if(hg)state.gu=hg;
+const shareKeys=['gu','type','area','age','low','lowType','sort4'];
+const hash=new URLSearchParams(location.hash.slice(1));
+for(const key of shareKeys)if(hash.has(key))state[key]=key==='low'?Number(hash.get(key)):hash.get(key);
+if(typeof state.gu!=='string')state.gu='전국';
 if(state.gu==="서울 전체")state.gu="서울";
 else if(!state.gu.includes("|")&&!D.provinces.includes(state.gu)&&state.gu!=="전국")state.gu="서울|"+state.gu;
 const province=()=>state.gu.split("|")[0];
@@ -234,7 +239,8 @@ const roneKey=()=>D.districts[province()]?.length===1?province():Object.keys(EX.
 })||state.gu.replace("|",">");
 const count=v=>ok(v)?v.toLocaleString():"–";
 const tradeAvailable=()=>AG[state.type][state.gu].n.some(ok);
-const save=()=>{try{localStorage.setItem("kb-trades",JSON.stringify(state));}catch(e){}};
+const conditionHash=()=>new URLSearchParams(shareKeys.map(k=>[k,String(state[k])])).toString();
+const save=()=>{try{localStorage.setItem("kb-trades",JSON.stringify(state));}catch(e){}try{history.replaceState(null,'','#'+conditionHash());}catch(e){}const input=$('#trade-share-url');if(!input.hidden)input.value=location.href;};
 const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
 const won=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
 const partial=m=>m>=D.partial_from;
@@ -460,18 +466,33 @@ function build(){const root=$("#panels"),byId=Object.fromEntries(P.map(p=>[p.id,
     for(const id of ids){const p=byId[id],s=document.createElement("section");s.className="panel"+(FULL.has(id)?" wide":"");s.id="p"+id;
       s.innerHTML=id===1?`<div class="body"></div>`:`<div class="ph"><h2>${p.title}</h2></div><p class="q">${p.q}</p><div class="body"></div>`;g.querySelector(".grid").appendChild(s);}}}
 function paint(){if(!TN[state.type])state.type="rh";if(!AG[state.type]?.[state.gu])state.gu="전국";loadSer();if(!$("#panels").children.length)build();header();
-  for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{if([1,2,3,5].includes(p.id)&&!tradeAvailable())body.innerHTML='<div class="empty">해당 지역의 실거래 자료가 아직 수집되지 않았거나 수집이 완료되지 않았습니다. 거래량·미분양·금리는 아래에서 확인할 수 있습니다.</div>';else p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}save();}
+  for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{if([1,2,3,5].includes(p.id)&&!tradeAvailable())body.innerHTML='<div class="empty">해당 지역의 실거래 자료가 아직 수집되지 않았거나 수집이 완료되지 않았습니다. 거래량·미분양·금리는 아래에서 확인할 수 있습니다.</div>';else p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}$("#trade-csv").disabled=activeProfile!==profileKey();save();}
 function render(){
-  if(!TN[state.type])state.type='rh';if(!D.agg[state.type]?.[state.gu])state.gu='전국';
-  if(!D.filters.area[state.area])state.area='all';if(!D.filters.age[state.age])state.age='all';
+  if(!Object.keys(TN).includes(state.type))state.type='rh';if(!D.agg[state.type]?.[state.gu])state.gu='전국';
+  if(!Object.keys(D.filters.area).includes(state.area))state.area='all';if(!Object.keys(D.filters.age).includes(state.age))state.age='all';
+  if(!['rh','offi','all'].includes(state.lowType))state.lowType='rh';
+  state.low=Number(state.low);if(![10000,15000,20000].includes(state.low))state.low=10000;
+  if(!['yo','pp','n3','nchg'].includes(state.sort4))state.sort4='yo';
+  $('#trade-csv').disabled=true;$('#trade-retry').hidden=true;save();
   const key=profileKey(),ticket=++renderId;
-  if(profileCache.has(key)){AG=profileCache.get(key);paint();return Promise.resolve();}
+  if(profileCache.has(key)){AG=profileCache.get(key);activeProfile=key;paint();return Promise.resolve();}
   header();$("#data-status").textContent='선택 조건의 분석 자료를 읽고 있습니다.';
   $("#kpis").replaceChildren();$("#panels").replaceChildren();
   return fetch(D.profile_files[key]).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(stats=>{
-    profileCache.set(key,stats);if(ticket!==renderId)return;AG=stats;paint();
-  }).catch(e=>{if(ticket!==renderId)return;$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 전체 면적·연식으로 다시 선택하거나 새로고침해 주세요.';header();$("#kpis").replaceChildren();$("#panels").replaceChildren();$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 전체 면적·연식으로 다시 선택하거나 새로고침해 주세요.';});
+    profileCache.set(key,stats);if(ticket!==renderId)return;AG=stats;activeProfile=key;paint();
+  }).catch(e=>{if(ticket!==renderId)return;$('#trade-csv').disabled=true;$('#trade-retry').hidden=false;$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 조건 자료 다시 읽기 버튼으로 재시도하세요.';header();$("#kpis").replaceChildren();$("#panels").replaceChildren();$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 조건 자료 다시 읽기 버튼으로 재시도하세요.';});
 }
+$('#trade-retry').onclick=()=>render();
+$('#trade-share').onclick=async()=>{save();const link=location.href;try{await navigator.clipboard.writeText(link);$('#trade-share-url').hidden=true;$('#trade-action-status').textContent='선택 조건 링크를 복사했습니다.';}catch(e){const input=$('#trade-share-url');input.value=link;input.hidden=false;input.focus();input.select();$('#trade-action-status').textContent='공유 주소를 직접 복사하세요.';}};
+$('#trade-csv').onclick=()=>{
+ if(activeProfile!==profileKey()||$('#trade-csv').disabled)return;
+ const a=AG[state.type][state.gu],price=monthlyPrice(a,'price'),ppa=monthlyPrice(a,'ppa');
+ const rows=[['지역','유형','면적 조건','연식 조건','연식 기준연도','계약월','집계 상태','거래 건수','가격 표본','㎡당 가격 표본','중위 거래가(만원)','㎡당 중위(만원/㎡)','하위25% 거래가(만원)','상위25% 거래가(만원)','수집일']];
+ MS.forEach((m,i)=>rows.push([regionLabel(state.gu),TN[state.type],D.filters.area[state.area],D.filters.age[state.age],D.filters.year,m,!ok(a.n[i])?'수집 누락'+(partial(m)?' · 집계 중':''):partial(m)?'집계 중':'신고 지연·정정 가능',a.n[i]??'',a.price_n[i]??'',a.ppa_n[i]??'',price[i]??'',ppa[i]??'',a.price_n[i]>=D.min_price_sample?a.q1[i]??'':'',a.price_n[i]>=D.min_price_sample?a.q3[i]??'':'',D.collected]));
+ const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='실거래_월별집계.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('#trade-action-status').textContent='선택 조건의 월별 집계를 내려받았습니다. 가격 표본 10건 미만은 가격·분포를 비워 둡니다.';
+};
+
 render();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
