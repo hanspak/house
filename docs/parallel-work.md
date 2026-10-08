@@ -30,7 +30,7 @@ Git worktree는 보안 격리가 아니다. 같은 사용자의 다른 폴더에
 2. Claude는 `docs/handoff/claude.md`, Codex는 `docs/handoff/codex.md`에 기록한다. 다른 브랜치의 미커밋 기록은 자동 공유되지 않는다. 기록을 커밋하면 다른 worktree에서 `git show work/claude:docs/handoff/claude.md` 같은 명령으로 확인할 수 있다.
 3. 완료 시 담당 파일을 명시적으로 스테이징하고 자신의 브랜치에서 커밋한다. 인수인계에는 검증과 남은 작업을 기록한다. 통합 폴더에서 다른 작업까지 포함할 수 있는 `git add -A`를 사용하지 않는다.
 4. 통합 담당자는 main 폴더가 깨끗한지 확인한 뒤 검토한 커밋만 `git cherry-pick <커밋SHA>`로 가져온다. 충돌 시 양쪽 의도를 확인하고 필요한 검사를 다시 실행한다.
-5. 원격 반영 요청을 받은 통합 담당자 한 명이 최신 origin/main을 확인한 후 main을 push하고 배포 결과를 확인한다. 두 도구가 동시에 main을 통합하거나 push하지 않는다.
+5. 사용자는 2026-10-08부터 검증된 변경의 자동 통합·게시를 허용했다. 담당 변경을 커밋한 뒤 자신의 worktree에서 `python3 scripts/publish_dashboard.py`를 실행한다. 이 명령은 검사, main fast-forward 통합, push, Actions 배포 및 공개 화면의 커밋 확인을 수행한다. 동시 실행은 잠금으로 차단하며 충돌·미커밋 변경은 덮어쓰지 않는다. fast-forward가 불가능하면 최신 main을 자신의 브랜치에 반영하고 충돌 해결·검사 후 재실행한다.
 6. 다음 작업 전 자신의 worktree가 깨끗할 때 `git merge main`으로 통합 결과를 반영한다. 미커밋 작업은 먼저 보존한다. 강제 초기화하지 않는다.
 
 공통 규칙 변경은 관련 문서에, 일회성 진행 상황은 역할별 인수인계에 기록한다. 상세 변경은 Git 커밋 이력으로 확인한다.

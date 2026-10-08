@@ -175,6 +175,7 @@ def render(data):
     out = os.path.join(out_dir, "trades.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
+                f'<meta name="build-commit" content="{os.environ.get("GITHUB_SHA", "local")}">'
                 '<meta name="viewport" content="width=device-width,initial-scale=1"></head><body>' + html + "</body></html>")
     update_status(trades=data["collected"][:10])
     print(f"생성: {out} ({os.path.getsize(out) / 1e6:.1f}MB, 1억~2억 이하 목록 {len(data['low'])}건)")
