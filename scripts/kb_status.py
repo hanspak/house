@@ -12,10 +12,11 @@ import datetime as dt
 import json
 import os
 import sys
+from data_health import kst_today, WEEKLY_DAYS, MONTHLY_MONTHS, COLLECTION_DAYS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(ROOT, "dashboard", "status.json")
-WEEKLY_DAYS, MONTHLY_MONTHS, TRADES_DAYS = 14, 2, 3
+TRADES_DAYS = COLLECTION_DAYS
 
 
 def update_status(**kw):
@@ -28,7 +29,7 @@ def update_status(**kw):
 
 
 def check(today=None):
-    today = today or dt.date.today()
+    today = today or kst_today()
     st = json.load(open(PATH, encoding="utf-8")) if os.path.exists(PATH) else {}
     msgs = []
     if "weekly" in st:

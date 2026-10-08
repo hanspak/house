@@ -9,6 +9,7 @@ from pathlib import Path
 
 from trade_regions import PROVINCES, KB_NAMES, districts
 from housing_moveins import shift
+from data_health import report, kst_today
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -93,7 +94,7 @@ def supply_metrics(region, pipeline=None, moveins=None, today=None):
     if moveins and '|' in region and not moveins['values'].get(region, {}).get('district_available', False):
         moveins_scope = province
     stats = moveins['values'].get(moveins_scope) if moveins else None
-    current = (today or dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()).strftime('%Y-%m')
+    current = (today or kst_today()).strftime('%Y-%m')
     note = '예정월 기재 물량 · 30세대 이상 공동주택 · 월 미정 별도'
     if moveins_scope != region:note += ' · 시군구 주소 미확인으로 상위 지역 자료'
     for size in (6,12):
@@ -169,17 +170,25 @@ def summarize(weekly, monthly, trades, supply=None, rents=None, pipeline=None, m
         extra_metrics, _, _ = supply_metrics(region, pipeline, moveins, today)
         metrics.update(extra_metrics)
         result[region] = metrics
-    return {'schema_version': 1, 'regions': regions, 'provinces': PROVINCES, 'districts': scope,
+    data = {'schema_version': 1, 'regions': regions, 'provinces': PROVINCES, 'districts': scope,
             'metrics': result, 'sources': [
-                {'name': 'KB 주간', 'period': weekly.get('asof'), 'collected': None},
-                {'name': 'KB 월간', 'period': monthly.get('asof'), 'collected': None}
+                {'name': 'KB 주간', 'kind': 'weekly', 'period': weekly.get('asof'), 'collected': None},
+                {'name': 'KB 월간', 'kind': 'kb_monthly', 'period': monthly.get('asof'), 'collected': None}
             ] + [s for s in trades.get('sources', []) if s['name'] != 'KB 월간'] + [
-                {'name': name, 'period': feed['months'][0] + '~' + feed['months'][-1] + ' · 기준 ' + feed['asof'] if feed.get('asof') else feed['months'][-1], 'collected': feed['collected']}
-                for name, feed in [('국토부 공식 미분양', supply), ('국토부 전월세', rents), ('아파트 공급 실적', pipeline), ('공동주택 입주예정', moveins)] if feed],
+                {'name': name, 'kind': 'forecast' if name == '공동주택 입주예정' else 'monthly',
+                 'asof': feed.get('asof') if feed else None,
+                 'horizon_start': feed['months'][0] if feed else None,
+                 'horizon_end': feed['months'][-1] if feed else None,
+                 'period': (feed['months'][0] + '~' + feed['months'][-1] + ' · 기준 ' + feed['asof'] if feed.get('asof') else feed['months'][-1]) if feed else None,
+                 'collected': feed.get('collected') if feed else None}
+                for name, feed in [('국토부 공식 미분양', supply), ('국토부 전월세', rents), ('아파트 공급 실적', pipeline), ('공동주택 입주예정', moveins)]],
             'kb_names': KB_NAMES,
             'supply': {'months': supply['months'], 'values': supply['values']} if supply else None,
             'rents': {'months': rents['months'], 'values': rents['values']} if rents else None,
-            'pipeline': {k:v for k,v in pipeline.items() if k != 'revision_history'} if pipeline else None, 'moveins': {k:v for k,v in moveins.items() if k != 'revision_history'} if moveins else None, 'view_month': (today or dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()).strftime('%Y-%m')}
+            'pipeline': {k:v for k,v in pipeline.items() if k != 'revision_history'} if pipeline else None, 'moveins': {k:v for k,v in moveins.items() if k != 'revision_history'} if moveins else None, 'view_month': (today or kst_today()).strftime('%Y-%m')}
+    data['health'] = report(data['sources'], today)
+    data['sources'] = data['health'].pop('sources')
+    return data
 
 
 def build():
