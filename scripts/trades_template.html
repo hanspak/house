@@ -154,6 +154,11 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <p class="note" id="filter-status"></p>
 <div class="controls" style="position:static" aria-label="선택 조건 내보내기"><button id="trade-share" type="button">선택 조건 링크 복사</button><button id="trade-csv" type="button" disabled>선택 조건 월별 CSV</button><button id="trade-retry" type="button" hidden>조건 자료 다시 읽기</button><input id="trade-share-url" type="text" readonly hidden aria-label="직접 복사할 공유 주소" style="width:100%;min-width:0"></div>
 <p class="note" id="trade-action-status" role="status" aria-live="polite"></p>
+<section class="controls" style="position:static" aria-label="저장한 실거래 조건">
+<button id="trade-save-filter" type="button">현재 조건 저장</button><span class="note">이 브라우저에 최대 6개 저장합니다.</span>
+<div id="trade-presets" style="display:flex;flex-wrap:wrap;gap:8px;width:100%;min-width:0"></div>
+<p class="note" id="trade-preset-status" role="status" aria-live="polite" style="margin:0"></p>
+</section>
 <div id="source-status" class="tbl"></div>
 <p class="note" id="data-status" role="status"></p>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
@@ -241,7 +246,42 @@ const roneKey=()=>D.districts[province()]?.length===1?province():Object.keys(EX.
 })||state.gu.replace("|",">");
 const count=v=>ok(v)?v.toLocaleString():"–";
 const tradeAvailable=()=>AG[state.type][state.gu].n.some(ok);
-const conditionHash=()=>new URLSearchParams(shareKeys.map(k=>[k,String(state[k])])).toString();
+const conditionHash=(selection=state)=>new URLSearchParams(shareKeys.map(k=>[k,String(selection[k])])).toString();
+const presetKey='kb-trades-presets-v1';
+function validPreset(p){
+ return p&&typeof p==='object'&&!Array.isArray(p)&&Object.keys(TN).includes(p.type)&&
+ Object.keys(D.agg[p.type]).includes(p.gu)&&Object.keys(D.filters.area).includes(p.area)&&
+ Object.keys(D.filters.age).includes(p.age)&&[10000,15000,20000].includes(p.low)&&
+ ['rh','offi','all'].includes(p.lowType)&&['yo','pp','n3','nchg'].includes(p.sort4);
+}
+const copyCondition=p=>Object.fromEntries(shareKeys.map(k=>[k,p[k]]));
+let presets=[];
+try{const stored=JSON.parse(localStorage.getItem(presetKey)||'[]');if(Array.isArray(stored))for(const p of stored){
+ if(validPreset(p)&&!presets.some(x=>conditionHash(x)===conditionHash(p)))presets.push(copyCondition(p));if(presets.length===6)break;
+}}catch(e){}
+const presetLabel=p=>`${regionLabel(p.gu)} · ${TN[p.type]} · ${D.filters.area[p.area]} · ${D.filters.age[p.age]} · 저가 ${p.low/10000}억/${p.lowType==='all'?'전체':TN[p.lowType]} · 정렬 ${{yo:'㎡당 가격 상승률',pp:'㎡당 가격',n3:'거래 건수',nchg:'거래 증가율'}[p.sort4]}`;
+function persistPresets(message){
+ try{localStorage.setItem(presetKey,JSON.stringify(presets));$('#trade-preset-status').textContent=message;}
+ catch(e){$('#trade-preset-status').textContent='브라우저 저장소에 반영하지 못했습니다. 변경은 현재 화면에서만 유지되며 새로고침하면 사라질 수 있습니다.';}
+ renderPresets();
+}
+function renderPresets(){
+ const root=$('#trade-presets');root.replaceChildren();
+ presets.forEach((p,i)=>{
+  const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px;max-width:100%;min-width:0';
+  const apply=document.createElement('button');apply.type='button';apply.textContent=presetLabel(p);apply.style.cssText='white-space:normal;text-align:left;min-width:0;overflow-wrap:anywhere';
+  apply.setAttribute('aria-pressed',String(conditionHash(p)===conditionHash()));
+  apply.onclick=()=>{Object.assign(state,p);render();$('#trade-preset-status').textContent='저장한 조건을 적용했습니다.';};
+  const remove=document.createElement('button');remove.type='button';remove.textContent='삭제';remove.style.flexShrink='0';remove.setAttribute('aria-label',presetLabel(p)+' 삭제');
+  remove.onclick=()=>{presets.splice(i,1);persistPresets('저장한 조건을 삭제했습니다.');};
+  row.append(apply,remove);root.append(row);
+ });
+}
+$('#trade-save-filter').onclick=()=>{
+ if(presets.some(p=>conditionHash(p)===conditionHash())){$('#trade-preset-status').textContent='이미 저장한 조건입니다.';return;}
+ if(presets.length>=6){$('#trade-preset-status').textContent='최대 6개까지 저장할 수 있습니다. 기존 조건을 삭제한 뒤 저장하세요.';return;}
+ presets.push(copyCondition(state));persistPresets('현재 조건을 이 브라우저에 저장했습니다.');
+};
 const save=()=>{try{localStorage.setItem("kb-trades",JSON.stringify(state));}catch(e){}try{history.replaceState(null,'','#'+conditionHash());}catch(e){}const input=$('#trade-share-url');if(!input.hidden)input.value=location.href;};
 const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
 const won=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
@@ -501,7 +541,7 @@ function render(){
   if(!['rh','offi','all'].includes(state.lowType))state.lowType='rh';
   state.low=Number(state.low);if(![10000,15000,20000].includes(state.low))state.low=10000;
   if(!['yo','pp','n3','nchg'].includes(state.sort4))state.sort4='yo';
-  $('#trade-csv').disabled=true;$('#trade-retry').hidden=true;save();
+  $('#trade-csv').disabled=true;$('#trade-retry').hidden=true;renderPresets();save();
   const key=profileKey(),ticket=++renderId;
   if(profileCache.has(key)){AG=profileCache.get(key);activeProfile=key;paint();return Promise.resolve();}
   header();$("#data-status").textContent='선택 조건의 분석 자료를 읽고 있습니다.';
