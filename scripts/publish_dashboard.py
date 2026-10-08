@@ -54,6 +54,33 @@ def get(url, deadline=None):
         time.sleep(delay)
 
 
+def verify_public(root, repo, sha, deadline):
+    base = f'https://{repo.split("/")[0]}.github.io/{repo.split("/")[1]}/'
+    modules = {'trades.html': 'profile_loader.js', 'index.html': 'market_analysis.js',
+               'monthly.html': 'market_analysis.js', 'overview.html': 'overview_comparison.js'}
+    pages = {}
+    for name, module in modules.items():
+        html = get(base + name + '?v=' + sha, deadline=deadline)
+        if f'name="build-commit" content="{sha}"' not in html:
+            return False
+        if (root / 'scripts' / module).read_text(encoding='utf-8') not in html:
+            raise SystemExit(f'공개 {name}의 계산 모듈이 예상과 다릅니다.')
+        pages[name] = html
+    match = re.search(r'"revision_file":"(overview-data/revisions\.([a-f0-9]{12})\.json)"', pages['overview.html'])
+    if not match:
+        raise SystemExit('공개 종합 화면에 변경 이력 파일 연결이 없습니다.')
+    body = get(base + match[1], deadline=deadline)
+    if hashlib.sha256(body.encode()).hexdigest()[:12] != match[2] or json.loads(body).get('schema_version') != 1:
+        raise SystemExit('변경 이력 파일의 공개 내용이 예상과 다릅니다.')
+    print('공개 4개 화면 커밋·계산 모듈 및 변경 이력 해시 확인 완료', flush=True)
+    print(f'게시 확인: {base}trades.html\n커밋: {sha}', flush=True)
+    return True
+
+
+def rate_limited(error):
+    return error.code == 429 or (error.code == 403 and (error.headers or {}).get('X-RateLimit-Remaining') == '0')
+
+
 def publish(root, timeout=600):
     common = Path(git(root, 'rev-parse', '--git-common-dir'))
     common = common if common.is_absolute() else root / common
@@ -87,56 +114,41 @@ def publish(root, timeout=600):
         def read(url):
             return get(url, deadline=end)
         last_state = None
+        api_limited = False
         while time.monotonic() < end:
-            runs = json.loads(read(api))['workflow_runs']
-            workflow = next((r for r in runs if r['path'].startswith('.github/workflows/dashboard.yml')), None)
+            if api_limited:
+                if verify_public(root, repo, sha, end):
+                    print('Actions status unavailable; publication verified from public files.', flush=True)
+                    return
+                time.sleep(20)
+                continue
+            try:
+                runs = json.loads(read(api))['workflow_runs']
+                workflow = next((r for r in runs if r['path'].startswith('.github/workflows/dashboard.yml')), None)
+                jobs = json.loads(read(workflow['jobs_url']))['jobs'] if workflow else []
+            except urllib.error.HTTPError as error:
+                if not rate_limited(error):
+                    raise
+                error.close()
+                api_limited = True
+                print('GitHub API rate limit: verifying public files; Actions status unavailable.', flush=True)
+                continue
             if workflow:
-                jobs = json.loads(read(workflow['jobs_url']))['jobs']
                 states = [(j['name'], j['status'], j['conclusion']) for j in jobs]
                 if states != last_state:
-                    print('배포 진행:', states, flush=True)
+                    print('Actions:', states, flush=True)
                     last_state = states
                 deploy = next((j for j in jobs if j['name'] == 'deploy'), None)
-                if deploy and deploy['conclusion'] == 'success':
-                    page = f'https://{repo.split("/")[0]}.github.io/{repo.split("/")[1]}/trades.html'
-                    trade_html = read(page + '?v=' + sha)
-                    if f'name="build-commit" content="{sha}"' in trade_html:
-                        loader = (root / 'scripts/profile_loader.js').read_text(encoding='utf-8')
-                        if loader not in trade_html:
-                            raise SystemExit('공개 실거래 화면의 조건 자료 모듈이 예상과 다릅니다.')
-                        kb_pages = [page.replace('trades.html', name) for name in ('index.html', 'monthly.html')]
-                        analysis = (root / 'scripts/market_analysis.js').read_text(encoding='utf-8')
-                        kb_html = [read(url + '?v=' + sha) for url in kb_pages]
-                        if any(f'name="build-commit" content="{sha}"' not in html or analysis not in html for html in kb_html):
-                            time.sleep(20)
-                            continue
-                        print('주간·월간 화면 커밋 및 계산 모듈 게시 확인', flush=True)
-                        if (root / 'scripts/market_overview.py').exists():
-                            overview = page.replace('trades.html', 'overview.html')
-                            page_html = read(overview + '?v=' + sha)
-                            if f'name="build-commit" content="{sha}"' not in page_html:
-                                time.sleep(20)
-                                continue
-                            comparison = (root / 'scripts/overview_comparison.js').read_text(encoding='utf-8')
-                            if comparison not in page_html:
-                                raise SystemExit('공개 종합 화면의 비교 계산 모듈이 예상과 다릅니다.')
-                            match = re.search(r'"revision_file":"(overview-data/revisions\.([a-f0-9]{12})\.json)"', page_html)
-                            if not match and (root / 'scripts/data_revisions.py').exists():
-                                raise SystemExit('공개 종합 화면에 변경 이력 파일 연결이 없습니다.')
-                            if match:
-                                body = read(overview.rsplit('/', 1)[0] + '/' + match[1])
-                                if hashlib.sha256(body.encode()).hexdigest()[:12] != match[2] or json.loads(body).get('schema_version') != 1:
-                                    raise SystemExit('변경 이력 파일의 공개 내용이 예상과 다릅니다.')
-                                print('변경 이력 파일 게시 확인', flush=True)
-                            print(f'종합 화면 게시 확인: {overview}', flush=True)
-                        print(f'게시 확인: {page}\n커밋: {sha}\nActions: {workflow["html_url"]}', flush=True)
-                        if any(j['name'] == 'freshness' and j['conclusion'] == 'failure' for j in jobs):
-                            print('자료 기준일 점검 알림이 있습니다. 배포는 성공했습니다.', flush=True)
-                        return
+                if deploy and deploy['conclusion'] == 'success' and verify_public(root, repo, sha, end):
+                    print('Actions:', workflow['html_url'], flush=True)
+                    if any(j['name'] == 'freshness' and j['conclusion'] == 'failure' for j in jobs):
+                        print('Publication succeeded; source freshness warning remains.', flush=True)
+                    return
                 if workflow['status'] == 'completed' and (not deploy or deploy['conclusion'] != 'success'):
-                    raise SystemExit(f'배포 실패: {workflow["html_url"]}')
+                    raise SystemExit('Deployment failed: ' + workflow['html_url'])
             time.sleep(20)
-        raise SystemExit('배포 확인 제한 시간을 초과했습니다. Actions 및 공개 주소를 확인하세요.')
+        raise SystemExit('Publication verification deadline exceeded. Check Actions and public pages.')
+
 
 
 if __name__ == '__main__':
