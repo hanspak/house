@@ -85,6 +85,7 @@ jobs:
           cp dashboard/latest.html _site/index.html
           cp dashboard/monthly.html _site/monthly.html
           cp dashboard/trades.html _site/trades.html
+          cp -R dashboard/trades-data _site/trades-data
           cp dashboard/kb_dashboard_*.html dashboard/monthly_*.html dashboard/status.json _site/
           touch _site/.nojekyll
 

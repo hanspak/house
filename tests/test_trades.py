@@ -123,7 +123,8 @@ class RoneTests(unittest.TestCase):
 
 class SnapshotTests(unittest.TestCase):
     def data(self, collected='2026-10-06 01:46 KST'):
-        return {'months': ['2026-09'], 'collected': collected, 'failed': 0,
+        return {'analysis_version': dashboard.ANALYSIS_VERSION,
+                'months': ['2026-09'], 'collected': collected, 'failed': 0,
                 'provinces': PROVINCES, 'districts': districts(),
                 'agg': {k: {p: {'n': [1], 'price': [10000], 'ppa': [200]}
                             for p in ['전국'] + PROVINCES} for k in collector.TYPES},
@@ -157,6 +158,30 @@ class SnapshotTests(unittest.TestCase):
             dashboard.save_snapshot(data, path)
             with self.assertRaises(SystemExit):
                 dashboard.build_snapshot(path)
+
+    def test_old_analysis_schema_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self.data()
+            del data['analysis_version']
+            path = str(Path(tmp) / 'trades.json.gz')
+            dashboard.save_snapshot(data, path)
+            with self.assertRaises(SystemExit):
+                dashboard.build_snapshot(path)
+
+    def test_render_separates_profile_assets_and_links_by_content_hash(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(dashboard, 'ROOT', tmp), \
+             patch.object(dashboard, 'update_status'):
+            tpl = Path(tmp) / 'scripts/trades_template.html'
+            tpl.parent.mkdir()
+            tpl.write_text('const D = /*DATA*/;')
+            data = self.data()
+            data['profiles'] = {'small-new': data['agg']}
+            page = Path(dashboard.render(data)).read_text()
+            assets = list((Path(tmp) / 'dashboard/trades-data').glob('small-new.*.json'))
+            self.assertEqual(len(assets), 1)
+            self.assertEqual(json.loads(assets[0].read_text()), data['agg'])
+            self.assertIn('trades-data/' + assets[0].name, page)
+            self.assertNotIn('"profiles":', page)
 
 
 if __name__ == '__main__':

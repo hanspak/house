@@ -11,51 +11,26 @@
 import datetime as dt
 import argparse
 import gzip
+import hashlib
 import json
 import os
-import statistics
 import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(__file__))
 from kb_status import update_status  # noqa: E402
 from trade_regions import PROVINCES, KB_NAMES, districts, normalize_trades, normalize_rone
+from trade_analysis import (aggregate_profiles, trade_recovery, source_dates,
+                            ANALYSIS_VERSION, MIN_PRICE_SAMPLE, AREA_OPTIONS, AGE_OPTIONS)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOW_PRICES = [10000, 15000, 20000]  # 만원: 1억, 1.5억, 2억 (목록에 담는 최대치는 2억)
 TYPE_NAMES = {"apt": "아파트", "rh": "연립·다세대", "offi": "오피스텔"}
 
 
-def med(xs):
-    return round(statistics.median(xs), 1) if xs else None
-
-
 def aggregate(tr):
-    """시·군·구, 시·도, 전국 월별 통계. 누락된 지역·월은 0건과 구분한다."""
-    months = tr["months"]
-    agg = {}
-    for kind, by_gu in tr["trades"].items():
-        agg[kind] = {}
-        expected = districts()
-        groups = {g: [g] for ids in expected.values() for g in ids}
-        groups.update(expected)
-        groups['전국'] = [g for ids in expected.values() for g in ids]
-        for gu, members in groups.items():
-            rows = [r for g in members for r in by_gu.get(g, [])]
-            missing = {m for g in members for m in tr.get('missing', {}).get(kind, {}).get(g, [])}
-            if any(g not in by_gu for g in members):
-                missing.update(months)
-            bym = {m: [] for m in months}
-            for r in rows:
-                m = r[0][:7]
-                if m in bym:
-                    bym[m].append(r)
-            agg[kind][gu] = {
-                "n": [None if m in missing else len(bym[m]) for m in months],
-                "price": [None if m in missing else med([r[5] for r in bym[m]]) for m in months],
-                "ppa": [None if m in missing else med([r[5] / r[3] for r in bym[m] if r[3] > 0]) for m in months],
-            }
-    return agg
+    """전국·시도·시군구 월별 및 실제 거래를 합친 3개월 통계."""
+    return aggregate_profiles(tr, districts(), filtered=False)['all-all']
 
 
 def low_price_list(tr, months_n=12):
@@ -129,15 +104,21 @@ def build(fetch=True, drive=False):
         kb = kb_monthly_series(mp)
 
     # 신고 기한(계약 후 30일) 때문에 이번 달·지난달 건수는 아직 늘어나는 중
-    today = dt.date.today()
+    today = dt.date.fromisoformat(tr["collected"][:10])
+    profiles = aggregate_profiles(tr, districts())
     data = {
         "months": tr["months"], "collected": tr["collected"], "failed": tr.get("failed", 0),
         "provinces": PROVINCES, "districts": districts(),
-        "agg": aggregate(tr), "low": low_price_list(tr),
+        "agg": profiles.pop("all-all"), "profiles": profiles, "low": low_price_list(tr),
         "extra": extra, "kb": kb,
         "partial_from": (today.replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m"),
         "type_names": TYPE_NAMES,
     }
+    data['analysis_version'] = ANALYSIS_VERSION
+    data['filters'] = {'area': AREA_OPTIONS, 'age': AGE_OPTIONS, 'year': today.year}
+    data['min_price_sample'] = MIN_PRICE_SAMPLE
+    data['recovery'] = trade_recovery(extra.get('apt_trades'), data['partial_from'])
+    data['sources'] = source_dates(data)
     if not data['failed']:
         save_snapshot(data, os.path.join(ROOT, 'cache', 'published', 'trades.json.gz'))
     return render(data)
@@ -162,7 +143,7 @@ def build_snapshot(path=None):
             continue
         with gzip.open(candidate, 'rt', encoding='utf-8') as f:
             data = json.load(f)
-        if data.get('failed') or data.get('provinces') != PROVINCES:
+        if data.get('failed') or data.get('provinces') != PROVINCES or data.get('analysis_version') != ANALYSIS_VERSION:
             continue
         if any(v is None for kind in data['agg'].values() for series in kind.values() for v in series['n']):
             continue
@@ -173,6 +154,19 @@ def build_snapshot(path=None):
 
 
 def render(data):
+    data = dict(data)
+    profiles = data.pop('profiles', {})
+    out_dir = os.path.join(ROOT, 'dashboard')
+    asset_dir = os.path.join(out_dir, 'trades-data')
+    os.makedirs(asset_dir, exist_ok=True)
+    data['profile_files'] = {}
+    for profile, stats in profiles.items():
+        payload = json.dumps(stats, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        name = profile + '.' + hashlib.sha256(payload).hexdigest()[:12] + '.json'
+        with open(os.path.join(asset_dir, name + '.part'), 'wb') as f:
+            f.write(payload)
+        os.replace(os.path.join(asset_dir, name + '.part'), os.path.join(asset_dir, name))
+        data['profile_files'][profile] = 'trades-data/' + name
     with open(os.path.join(ROOT, "scripts", "trades_template.html"), encoding="utf-8") as f:
         tpl = f.read()
     html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))

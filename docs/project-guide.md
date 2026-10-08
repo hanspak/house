@@ -29,3 +29,16 @@ GitHub Pages: https://hanspak.github.io/house/trades.html
 `.github/workflows/dashboard.yml`은 main의 관련 변경을 게시한다. 실거래 화면은 집계 자료로 먼저 게시하고, 정기·수동 실행의 데이터 갱신은 배포 뒤 별도 작업으로 수행한다. 수집 실패가 화면 게시를 막는 구조로 되돌리지 않는다. 상세 설정은 `google-drive-setup.md`를 참고한다.
 
 커밋, 원격 push, Actions 실행, Pages 게시를 각각 확인한다. 공개 주소 확인 전에는 배포 완료라고 보고하지 않는다. 자료 기준일은 실제 수집일을 유지한다.
+
+
+## 조건별 실거래 분석
+
+실거래 계산은 `scripts/trade_analysis.py`에 모으고 HTML은 계산 결과 표시와 조건 선택을 담당한다. 공개 집계 규격은 `analysis_version`으로 구분한다. 규격 변경 시 게시용 `data/trades.json.gz`도 같은 규격으로 생성해야 한다.
+
+`--snapshot`은 HTML과 `dashboard/trades-data/` 조건별 JSON을 함께 생성한다. 배포할 때 둘 다 포함한다. 조건 필터 미리보기는 파일을 직접 여는 대신 자신의 worktree에서 아래 명령을 실행하고 http://localhost:8765/trades.html 을 연다. 두 도구가 동시에 실행할 때는 포트를 다르게 지정한다.
+
+```sh
+python3 -m http.server 8765 --directory dashboard
+```
+
+준공 후 미분양·공급·임대차 수집, 원자료 수정 이력, 다른 화면의 계산 분리는 후속 작업이다.

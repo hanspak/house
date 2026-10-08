@@ -148,7 +148,11 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
   <div class="ctl"><label for="f-province">시·도</label><select id="f-province"></select></div>
   <div class="ctl"><label for="f-gu">시·군·구</label><select id="f-gu"></select></div>
   <div class="ctl">유형 <div class="seg" id="f-type"><button data-v="apt">아파트</button><button data-v="rh">연립·다세대</button><button data-v="offi">오피스텔</button></div></div>
+  <div class="ctl"><label for="f-area">전용면적</label><select id="f-area"></select></div>
+  <div class="ctl"><label for="f-age">연식</label><select id="f-age"></select></div>
 </div>
+<p class="note" id="filter-status"></p>
+<div id="source-status" class="tbl"></div>
 <p class="note" id="data-status" role="status"></p>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
 <div id="panels"></div>
@@ -212,8 +216,11 @@ function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fi
   if(onclick){h.addEventListener("click",onclick);h.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onclick();}});}}
 
 // ---------- data ----------
-const TN=D.type_names, MS=D.months, AG=D.agg, EX=D.extra||{};
-const state={gu:"전국",type:"rh",low:10000,lowType:"rh"};
+const TN=D.type_names, MS=D.months, EX=D.extra||{};
+let AG=D.agg;
+const profileCache=new Map([["all-all",D.agg]]);
+let renderId=0;
+const state={gu:"전국",type:"rh",low:10000,lowType:"rh",area:"all",age:"all"};
 try{Object.assign(state,JSON.parse(localStorage.getItem("kb-trades")||"{}"));}catch(e){}
 const hg=new URLSearchParams(location.hash.slice(1)).get("gu");if(hg)state.gu=hg;
 if(state.gu==="서울 전체")state.gu="서울";
@@ -234,8 +241,20 @@ const partial=m=>m>=D.partial_from;
 const full=MS.filter(m=>!partial(m)); // 신고가 거의 끝난 달
 const IDX=m=>MS.indexOf(m);
 const sum=(a,ix)=>ix.length&&ix.every(i=>ok(a[i]))?ix.reduce((s,i)=>s+a[i],0):null;
-const medOf=(arr,ix)=>{const v=ix.map(i=>arr[i]).filter(ok).sort((x,y)=>x-y);return v.length?(v[Math.floor((v.length-1)/2)]+v[Math.floor(v.length/2)])/2:null;};
-const periodMedian=(a,key,ix)=>ix.every(i=>ok(a.n[i]))?medOf(a[key],ix):null;
+const periodMedian=(a,key,ix)=>{
+  if(ix.length!==3||ix.some((v,i)=>i&&v!==ix[i-1]+1))return null;
+  const p=a.period3,j=ix[2];
+  return p&&p[key==='ppa'?'ppa_n':'price_n'][j]>=D.min_price_sample?p[key][j]:null;
+};
+const monthlyPrice=(a,key)=>a[key].map((v,i)=>a[key==='ppa'?'ppa_n':'price_n'][i]>=D.min_price_sample?v:null);
+const profileKey=()=>state.area+"-"+state.age;
+const filtered=()=>profileKey()!=="all-all";
+function rowMatches(r){
+  const area=r[5],built=r[8],age=typeof built==="number"&&built>=1800&&built<=D.filters.year?D.filters.year-built:null;
+  const a=area>0?(area<=60?"small":area<=85?"medium":"large"):null;
+  const y=age==null?null:age<=5?"new":age<=20?"middle":"old";
+  return (state.area==="all"||state.area===a)&&(state.age==="all"||state.age===y);
+}
 const monthLabels=(dates)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=Math.max(1,Math.ceil((y1-y0+1)/7));
   if(y1-y0<=2){dates.forEach((d,i)=>{if(d.endsWith("-01")||i===0)txt(svg,X(i),h-6,d.slice(2).replace("-","."),{"text-anchor":"middle",class:"muted"});});return;}
   for(let y=y0;y<=y1;y++){if((y-y0)%e)continue;const i=dates.findIndex(d=>d>=y+"-01");if(i>0&&X(i)<w-m.r-12)txt(svg,X(i),h-6,y,{"text-anchor":"middle",class:"muted"});}};
@@ -266,7 +285,7 @@ def(1,"요약","",true,(box)=>{
   for(const k of ["apt","rh","offi"]){const a=AG[k][g],n3=sum(a.n,last3),n3p=prev3.length===3?sum(a.n,prev3):null,pp=periodMedian(a,"ppa",last3),ppp=prev3.length===3?periodMedian(a,"ppa",prev3):null;
     const yo=ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN;
     f.push(`<div class="fact"><div class="k">${TN[k]} 거래 (${p3label})</div><div class="v">${count(n3)}건</div><div class="d">1년 전 같은 3개월 ${n3p!=null?n3p.toLocaleString()+"건":"–"}${ok(n3)&&n3p?` (${fmt((n3/n3p-1)*100,0)}%)`:""} · ㎡당 중위 ${won(pp)} (${pct(yo,1)})</div></div>`);}
-  const low=D.low.filter(r=>regionMatches(g,r[1])&&r[7]<=10000&&r[2].slice(0,7)>=MS[last3[0]]),lr=low.filter(r=>r[0]==="rh").length,lo=low.filter(r=>r[0]==="offi").length;
+  const low=D.low.filter(r=>rowMatches(r)&&regionMatches(g,r[1])&&r[7]<=10000&&r[2].slice(0,7)>=MS[last3[0]]),lr=low.filter(r=>r[0]==="rh").length,lo=low.filter(r=>r[0]==="offi").length;
   f.push(`<div class="fact"><div class="k">1억 이하 거래 (${p3label}~현재)</div><div class="v">${(lr+lo).toLocaleString()}건</div><div class="d">연립·다세대 ${lr}건 · 오피스텔 ${lo}건 · 아래 목록에서 확인</div></div>`);
   const rt=EX.rates;if(rt){const [mv,mi]=lastOk(rt.values["주택담보대출"]),[bv]=lastOk(rt.values["기준금리"]);
     f.push(`<div class="fact"><div class="k">주택담보대출 금리 (${rt.months[mi]})</div><div class="v">${ok(mv)?mv.toFixed(2)+"%":"–"}</div><div class="d">기준금리 ${ok(bv)?bv.toFixed(2)+"%":"–"} · 1년 전 주담대 ${ok(rt.values["주택담보대출"][mi-12])?rt.values["주택담보대출"][mi-12].toFixed(2)+"%":"–"}</div></div>`);}
@@ -288,10 +307,10 @@ def(3,"선택 유형 ㎡당 중위 거래가","실제 거래된 가격은 오르
   const g=state.gu,k=state.type,a=AG[k][g];
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${g} ${TN[k]} · 전용 ㎡당 중위 거래가(만원) · 막대 = 거래 건수`;box.appendChild(sub);
   const d_=document.createElement("div");box.appendChild(d_);const m={l:44,r:70,t:10,b:24},h=230;
-  const r=lineChart(d_,{n:MS.length,series:[{v:a.ppa,c:SER[0],end:true}],w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>㎡당 ${won(a.ppa[i])} · 중위 ${won(a.price[i])}<br>${a.n[i]}건`});
+  const r=lineChart(d_,{n:MS.length,series:[{v:monthlyPrice(a,"ppa"),c:SER[0],end:true}],w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>㎡당 ${won(monthlyPrice(a,"ppa")[i])} · 중위 ${won(monthlyPrice(a,"price")[i])}<br>${a.n[i]}건`});
   const maxn=Math.max(...a.n.filter(ok),1),bw=(r.X(1)-r.X(0))*.6;
   a.n.forEach((n,i)=>{if(ok(n))el("rect",{x:r.X(i)-bw/2,y:h-m.b-(n/maxn)*40,width:bw,height:(n/maxn)*40,fill:css("--ink-3"),opacity:partial(MS[i])?.15:.3},r.svg);});
-  endLabels(r,[{v:lastOk(a.ppa)[0],t:`${won(lastOk(a.ppa)[0])}/㎡`}],MS.length);
+  endLabels(r,[{v:lastOk(monthlyPrice(a,"ppa"))[0],t:`${won(lastOk(monthlyPrice(a,"ppa"))[0])}/㎡`}],MS.length);
   const pp=periodMedian(a,"ppa",last3),ppp=prev3.length===3?periodMedian(a,"ppa",prev3):null;
   const f=document.createElement("p");f.className="finding";f.innerHTML=`${p3label} ㎡당 중위 <b>${won(pp)}</b> · 1년 전 같은 기간 ${won(ppp)} (<b>${pct(ok(pp)&&ok(ppp)?(pp/ppp-1)*100:NaN,1)}</b>). 전용 ${k==="apt"?84:59}㎡로 환산하면 약 ${won(ok(pp)?pp*(k==="apt"?84:59):null)}.`;box.appendChild(f);
 });
@@ -309,7 +328,7 @@ def(4,"지역별 비교","어느 지역에서 거래가 많고, 실거래가가 
 });
 
 def(5,"소액 거래 (연립·다세대, 오피스텔)","실제로 1억·1.5억·2억 이하에 거래된 집은 어디에 있나",true,(box)=>{
-  const g=state.gu,lim=state.low,lt=state.lowType,rows=D.low.filter(r=>(lt==="all"||r[0]===lt)&&r[7]<=lim);
+  const g=state.gu,lim=state.low,lt=state.lowType,rows=D.low.filter(r=>rowMatches(r)&&(lt==="all"||r[0]===lt)&&r[7]<=lim);
   const byGu=compareRegions().map(x=>({k:x,label:regionLabel(x),v:rows.filter(r=>regionMatches(x,r[1])).length,onclick:goGu(x)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
   const list=rows.filter(r=>regionMatches(g,r[1]));
   box.innerHTML=`<div class="card-head"><p class="sub" style="margin:0">최근 12개월 실거래 · 금액 = 실제 거래가(공시가격 아님)</p>
@@ -325,18 +344,19 @@ def(5,"소액 거래 (연립·다세대, 오피스텔)","실제로 1억·1.5억�
 });
 
 def(6,"KB 시세 vs 실거래","선택 시·도의 KB 조사 시세와 실제 거래가는 얼마나 다른가",false,(box)=>{
+  if(filtered())return box.innerHTML='<div class="empty">KB 비교는 전체 면적·연식에서 제공합니다. 조건이 다른 시세를 직접 비교하지 않습니다.</div>';
   const kb=D.kb;if(!kb)return box.innerHTML='<div class="empty">KB 월간 자료가 없어 비교할 수 없습니다</div>';
   if(state.type==="offi")return box.innerHTML='<div class="empty">오피스텔은 비교할 KB 중위 시세 자료가 없습니다</div>';
   const k=state.type,p=province(),kbS=kb.values[p]?.[k==="apt"?"apt":"row"],a=AG[k][p];
   if(!kbS||!a.n.some(ok))return box.innerHTML='<div class="empty">해당 시·도의 KB 시세 또는 실거래 자료가 없습니다</div>';
   const kbv=MS.map(m=>{const j=kb.dates.indexOf(m);return j>=0?kbS[j]:null;});
-  const series=[{v:kbv,c:SER[0],end:true,n:"KB 중위 시세"},{v:a.price,c:SER[1],end:true,n:"실거래 중위"}];
+  const series=[{v:kbv,c:SER[0],end:true,n:"KB 중위 시세"},{v:monthlyPrice(a,"price"),c:SER[1],end:true,n:"실거래 중위"}];
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${p} ${TN[k]} 중위 매매가(억) · 시·도 전체 KB 월간 시세 vs 국토부 실거래`;box.appendChild(sub);
   const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:110,t:10,b:24};
   const sc=series.map(s=>({...s,v:s.v.map(x=>ok(x)?x/10000:null)}));
   const r=lineChart(d_,{n:MS.length,series:sc,w:560,h:230,m,yfmt:v=>v.toFixed(1),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}</b><br>`+series.map(s=>`${s.n} ${won(s.v[i])}`).join("<br>")});
   endLabels(r,sc.map(s=>({v:lastOk(s.v)[0],t:`${s.n} ${ok(lastOk(s.v)[0])?lastOk(s.v)[0].toFixed(2)+"억":""}`})),MS.length);
-  const [kv,ki]=lastOk(kbv),av=a.price[ki];
+  const [kv,ki]=lastOk(kbv),av=monthlyPrice(a,"price")[ki];
   const f=document.createElement("p");f.className="finding";f.innerHTML=ok(kv)&&ok(av)?`${MS[ki]} 기준 KB 중위 시세 <b>${won(kv)}</b>, 실거래 중위 <b>${won(av)}</b> (차이 ${fmt((kv/av-1)*100,1)}%). 실거래 중위는 그 달 거래된 집의 구성(지역·면적)에 따라 크게 달라지고, KB 시세는 전체 표본 기준이라 두 값이 다릅니다.`:"비교할 같은 달 자료가 없습니다.";box.appendChild(f);
 });
 
@@ -395,10 +415,34 @@ def(10,"미분양 주택","분양하고 팔리지 않은 집이 늘고 있나 (�
   const b_=document.createElement("div");box.appendChild(b_);hbars(b_,items,{fmt:v=>v.toLocaleString(),unit:"호",hl:province(),w:560,right:130});
   const f=document.createElement("p");f.className="finding";f.innerHTML=`${dd[ni]} 전국 미분양 <b>${nv.toLocaleString()}호</b> · 1년 전 ${ok(u.values["전국"][ni-12])?u.values["전국"][ni-12].toLocaleString():"–"}호 (<b>${pct(ok(u.values["전국"][ni-12])?(nv/u.values["전국"][ni-12]-1)*100:NaN,1)}</b>). 준공 후 미분양(악성 미분양)은 이 표에 따로 없습니다.`;box.appendChild(f);
 });
+def(11,"거래 표본과 가격 분포","표본 수와 가격 분포를 함께 확인",false,box=>{
+  const a=AG[state.type][state.gu],end=last3[2],p=a.period3,n=p?.n[end],valid=p?.price_n[end];
+  const enough=valid>=D.min_price_sample;
+  box.innerHTML=`<p class="sub">${p3label} · ${TN[state.type]} · 선택한 면적·연식 조건</p>
+    <div class="facts"><div class="fact"><div class="k">거래 건수</div><div class="v">${count(n)}건</div></div>
+    <div class="fact"><div class="k">가격 분석 표본</div><div class="v">${count(valid)}건</div></div></div>
+    <p class="finding">${n==null?"수집 누락으로 분석을 보류합니다.":!enough?`가격 표본이 ${D.min_price_sample}건 미만이라 가격 및 상승률 표시를 보류합니다.`:`가격 하위 25% ${won(p.q1[end])} · 중위 ${won(p.price[end])} · 상위 25% ${won(p.q3[end])}`}</p>
+    <p class="sub">${D.min_price_sample}건은 이 화면의 표시 기준이며 통계적 신뢰를 보장하는 기준은 아닙니다. 가격 분포는 신뢰구간이 아닙니다. 면적·연식을 좁혀도 단지·층·입지 차이는 남습니다.</p>`;
+});
+def(12,"아파트 거래 회복률","평소 같은 계절보다 거래가 얼마나 활발한가",false,box=>{
+  const r=D.recovery?.[roneKey()];
+  if(!r)return box.innerHTML='<div class="empty">선택 지역의 장기 거래량 자료가 없습니다</div>';
+  box.innerHTML=`<p class="sub">${regionLabel(state.gu)} · R-ONE 아파트 전체 · 면적·연식 및 유형 필터 미적용</p>
+    <div class="fact"><div class="k">${r.from}~${r.to} 동기간 대비</div><div class="v">${ok(r.ratio)?r.ratio.toFixed(1)+"%":"–"}</div></div>
+    <p class="finding">최근 3개월 ${count(r.n)}호 · 직전 5년 중 자료가 완전한 ${r.years}개 동기간 평균 ${count(r.baseline)}호. 100%는 해당 평균과 같은 거래량입니다.</p>
+    <p class="sub">최소 3개 과거 동기간이 있어야 계산합니다. 신고 집계 중인 달은 제외합니다. 과거 대출·정책 환경이 달라 가격 상승이나 매수 적기를 뜻하지 않습니다.</p>`;
+});
 // ---------- shell ----------
-const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","전국 시·도 · 최근 24개월 · 계약월 기준",[2,3,4,5,6]],["g-vol","거래량·미분양·금리","",[7,10,8,9]]];
+const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","전국 시·도 · 최근 24개월 · 계약월 기준",[2,3,11,4,5,6]],["g-vol","거래량·미분양·금리","",[12,7,10,8,9]]];
 const FULL=new Set([1,4,5]);
 function header(){
+  for(const key of ['area','age']){
+    const select=$("#f-"+key);
+    if(!select.options.length)Object.entries(D.filters[key]).forEach(([v,label])=>select.add(new Option(label,v)));
+    select.value=state[key];select.onchange=()=>{state[key]=select.value;render();};
+  }
+  $("#filter-status").textContent=`실거래·소액 목록: ${D.filters.area[state.area]} / ${D.filters.age[state.age]} (${D.filters.year}년 기준). 연식은 건축연도 기준이며 조건 선택 시 미확인 값은 제외합니다. R-ONE·금리는 전체 자료입니다.`;
+  $("#source-status").innerHTML=`<table><thead><tr><th>자료</th><th>최신 자료 기간</th><th>수집일</th><th>기준</th></tr></thead><tbody>${(D.sources||[]).map(x=>`<tr><td>${x.name}</td><td>${x.period||'–'}</td><td>${x.collected||'기록 없음'}</td><td>${x.basis}</td></tr>`).join('')}</tbody></table>`;
   $("#collected").textContent=D.collected+(D.failed?` · 미수집·실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=regionLabel(state.gu);
   const a=AG[state.type][state.gu];
   $("#data-status").textContent=a.n.every(v=>!ok(v))?"이 지역의 실거래 수집이 아직 완료되지 않았습니다. 거래량·미분양·금리는 별도 자료로 표시합니다.":a.n.some(v=>!ok(v))?"일부 월의 실거래 수집이 완료되지 않아 해당 통계는 –로 표시합니다. 소액 목록에는 수집된 거래만 표시합니다.":"";
@@ -415,8 +459,19 @@ function build(){const root=$("#panels"),byId=Object.fromEntries(P.map(p=>[p.id,
   for(const [gid,title,sub,ids] of GROUPS){const g=document.createElement("section");g.className="group";g.id=gid;g.innerHTML=`<h2>${title}</h2>${sub?`<p class="gsub">${sub}</p>`:""}<div class="grid"></div>`;root.appendChild(g);
     for(const id of ids){const p=byId[id],s=document.createElement("section");s.className="panel"+(FULL.has(id)?" wide":"");s.id="p"+id;
       s.innerHTML=id===1?`<div class="body"></div>`:`<div class="ph"><h2>${p.title}</h2></div><p class="q">${p.q}</p><div class="body"></div>`;g.querySelector(".grid").appendChild(s);}}}
-function render(){if(!TN[state.type])state.type="rh";if(!AG[state.type]?.[state.gu])state.gu="전국";loadSer();if(!$("#panels").children.length)build();header();
+function paint(){if(!TN[state.type])state.type="rh";if(!AG[state.type]?.[state.gu])state.gu="전국";loadSer();if(!$("#panels").children.length)build();header();
   for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{if([1,2,3,5].includes(p.id)&&!tradeAvailable())body.innerHTML='<div class="empty">해당 지역의 실거래 자료가 아직 수집되지 않았거나 수집이 완료되지 않았습니다. 거래량·미분양·금리는 아래에서 확인할 수 있습니다.</div>';else p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}save();}
+function render(){
+  if(!TN[state.type])state.type='rh';if(!D.agg[state.type]?.[state.gu])state.gu='전국';
+  if(!D.filters.area[state.area])state.area='all';if(!D.filters.age[state.age])state.age='all';
+  const key=profileKey(),ticket=++renderId;
+  if(profileCache.has(key)){AG=profileCache.get(key);paint();return Promise.resolve();}
+  header();$("#data-status").textContent='선택 조건의 분석 자료를 읽고 있습니다.';
+  $("#kpis").replaceChildren();$("#panels").replaceChildren();
+  return fetch(D.profile_files[key]).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(stats=>{
+    profileCache.set(key,stats);if(ticket!==renderId)return;AG=stats;paint();
+  }).catch(e=>{if(ticket!==renderId)return;$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 전체 면적·연식으로 다시 선택하거나 새로고침해 주세요.';header();$("#kpis").replaceChildren();$("#panels").replaceChildren();$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 전체 면적·연식으로 다시 선택하거나 새로고침해 주세요.';});
+}
 render();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
