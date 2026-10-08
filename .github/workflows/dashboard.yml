@@ -48,7 +48,7 @@ jobs:
           node-version: "22"
 
       - name: 대시보드 지표·지역 비교 계산 검사
-        run: node --test tests/market_analysis.test.cjs tests/overview_comparison.test.cjs
+        run: node --test tests/market_analysis.test.cjs tests/overview_comparison.test.cjs tests/profile_loader.test.cjs
 
       - name: 전국 실거래 집계 검사
         run: python -m unittest discover -s tests -v

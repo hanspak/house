@@ -169,7 +169,9 @@ def render(data):
         data['profile_files'][profile] = 'trades-data/' + name
     with open(os.path.join(ROOT, "scripts", "trades_template.html"), encoding="utf-8") as f:
         tpl = f.read()
-    html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    with open(os.path.join(os.path.dirname(__file__), "profile_loader.js"), encoding="utf-8") as f:
+        loader = f.read()
+    html = tpl.replace("/*LOADER*/", loader).replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, "trades.html")

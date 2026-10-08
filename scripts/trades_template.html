@@ -163,6 +163,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <div id="tip" hidden></div>
 
 <script>
+/*LOADER*/
 const D = /*DATA*/;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const NS="http://www.w3.org/2000/svg";
@@ -221,6 +222,7 @@ function hitDot(svg,cx,cy,html,onclick,label){const h=el("circle",{cx,cy,r:13,fi
 const TN=D.type_names, MS=D.months, EX=D.extra||{};
 let AG=D.agg;
 const profileCache=new Map([["all-all",D.agg]]);
+const profileLoader=ProfileLoader.create(profileCache,(key,signal)=>fetch(D.profile_files[key],{signal}).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json();}),stats=>ProfileLoader.validate(stats,D.agg,MS.length));
 let renderId=0,activeProfile="all-all";
 const state={gu:"전국",type:"rh",low:10000,lowType:"rh",area:"all",age:"all"};
 try{Object.assign(state,JSON.parse(localStorage.getItem("kb-trades")||"{}"));}catch(e){}
@@ -478,8 +480,8 @@ function render(){
   if(profileCache.has(key)){AG=profileCache.get(key);activeProfile=key;paint();return Promise.resolve();}
   header();$("#data-status").textContent='선택 조건의 분석 자료를 읽고 있습니다.';
   $("#kpis").replaceChildren();$("#panels").replaceChildren();
-  return fetch(D.profile_files[key]).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(stats=>{
-    profileCache.set(key,stats);if(ticket!==renderId)return;AG=stats;activeProfile=key;paint();
+  return profileLoader.load(key).then(stats=>{
+    if(ticket!==renderId)return;AG=stats;activeProfile=key;paint();
   }).catch(e=>{if(ticket!==renderId)return;$('#trade-csv').disabled=true;$('#trade-retry').hidden=false;$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 조건 자료 다시 읽기 버튼으로 재시도하세요.';header();$("#kpis").replaceChildren();$("#panels").replaceChildren();$("#data-status").textContent='선택 조건의 자료를 읽지 못했습니다. 조건 자료 다시 읽기 버튼으로 재시도하세요.';});
 }
 $('#trade-retry').onclick=()=>render();

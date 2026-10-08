@@ -41,7 +41,7 @@ def publish(root, timeout=600):
                 raise SystemExit(f'{folder}: 미커밋 변경이 있습니다. 담당 변경을 먼저 커밋하세요.')
         if git(integration, 'branch', '--show-current') != 'main':
             raise SystemExit('통합 폴더가 main이 아닙니다. 브랜치를 자동 변경하지 않습니다.')
-        run(root, 'node', '--test', 'tests/market_analysis.test.cjs', 'tests/overview_comparison.test.cjs')
+        run(root, 'node', '--test', 'tests/market_analysis.test.cjs', 'tests/overview_comparison.test.cjs', 'tests/profile_loader.test.cjs')
         run(root, 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-v')
         run(root, 'python3', '-B', 'scripts/kb_trades_dashboard.py', '--snapshot')
         if (root / 'scripts/market_overview.py').exists():
