@@ -147,6 +147,8 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
   <div class="ctl">가격 <div class="seg" id="f-mode"><button data-v="sale">매매</button><button data-v="jeonse">전세</button></div></div>
   <div class="ctl">기간 <div class="seg" id="f-range"><button data-v="5y">5년</button><button data-v="2008">2008~</button><button data-v="all">전체</button></div></div>
 </div>
+<div class="controls" style="position:static" aria-label="선택 조건 내보내기"><button id="monthly-share" type="button">선택 조건 링크 복사</button><button id="monthly-csv" type="button">선택 지역 지수 CSV</button><input id="monthly-share-url" type="text" readonly hidden aria-label="직접 복사할 공유 주소" style="width:100%;min-width:0"></div>
+<p id="monthly-action-status" class="sub" role="status" aria-live="polite"></p>
 <nav class="toc" aria-label="구역 이동" id="toc"></nav>
 <div id="panels"></div>
 <p class="note">출처: KB부동산 월간 주택 시계열(<span id="src2"></span>). 지수 기준 2026-01 = 100. KB는 2022년 11월 표본을 크게 늘렸습니다(아파트 약 6만 2천 개 면적, 단독 3천, 연립 2천5백). 그래서 평균·중위 가격, 전세가율, 5분위 가격은 2022-10 → 11월 사이에 계단처럼 바뀌어 있으며, KB는 시장 흐름은 지수 변동률로 보라고 안내합니다. HAI는 2019년부터 개편된 가계동향조사 소득을 씁니다. 국면·해석 문구는 이 화면이 정한 참고용입니다. <a href="https://github.com/hanspak/house/blob/main/docs/indicators.md" style="color:var(--accent)">지표 정의 보기</a></p>
@@ -216,10 +218,16 @@ const REGIONS=["전국","수도권",...PROVS];
 const SH=k=>k.replace(/특별자치시|특별자치도|광역시|특별시/,"").replace(/^충청북도$/,"충북").replace(/^충청남도$/,"충남").replace(/^경상북도$/,"경북").replace(/^경상남도$/,"경남").replace(/^전라남도$/,"전남").replace(/^강원$/,"강원");
 const short=k=>k.includes("|")?k.split("|")[1]:k;
 const VIEWS=Object.fromEntries(D.views.map(v=>[v.id,v]));
-const state={region:"서울특별시",mode:"sale",range:"2008"};
+const state={region:"서울특별시",mode:"sale",range:"2008",ptype:"apt"};
 try{Object.assign(state,JSON.parse(localStorage.getItem("kb-monthly")||"{}"));}catch(e){}
-const hr=new URLSearchParams(location.hash.slice(1)).get("region");if(hr)state.region=hr;
-const save=()=>{try{localStorage.setItem("kb-monthly",JSON.stringify(state));}catch(e){}};
+const shareKeys=['region','mode','range','ptype'];
+const hash=new URLSearchParams(location.hash.slice(1));
+for(const key of shareKeys)if(hash.has(key))state[key]=hash.get(key);
+const save=()=>{
+ try{localStorage.setItem("kb-monthly",JSON.stringify(state));}catch(e){}
+ try{history.replaceState(null,'','#'+new URLSearchParams(shareKeys.map(k=>[k,state[k]])).toString());}catch(e){}
+ const input=$('#monthly-share-url');if(!input.hidden)input.value=location.href;
+};
 const M=()=>MODE[state.mode];
 const ser=(obj,k)=>obj&&obj.values[k]?obj.values[k]:null;
 const lastOk=MarketAnalysis.lastOk;
@@ -435,8 +443,31 @@ function build(){const root=$("#panels"),byId=Object.fromEntries(P.map(p=>[p.id,
   for(const [gid,title,sub,ids] of GROUPS){const g=document.createElement("section");g.className="group";g.id=gid;g.innerHTML=`<h2>${title}</h2>${sub?`<p class="gsub">${sub}</p>`:""}<div class="grid"></div>`;root.appendChild(g);
     for(const id of ids){const p=byId[id],s=document.createElement("section");s.className="panel"+(FULL.has(id)?" wide":"");s.id="p"+id;
       s.innerHTML=id===1?`<div class="body"></div>`:`<div class="ph"><h2>${p.title}</h2></div><p class="q">${p.q}</p><div class="body"></div>`;g.querySelector(".grid").appendChild(s);}}}
-function render(){if(!REGIONS.includes(state.region))state.region="서울특별시";loadSer();if(!$("#panels").children.length)build();header();
+function render(){if(!REGIONS.includes(state.region))state.region="서울특별시";
+  if(!['sale','jeonse'].includes(state.mode))state.mode='sale';
+  if(!['5y','2008','all'].includes(state.range))state.range='2008';
+  if(!TYPES.some(([type])=>type===state.ptype))state.ptype='apt';loadSer();if(!$("#panels").children.length)build();header();
   for(const p of P){const body=$("#p"+p.id+" .body");body.innerHTML="";try{p.fn(body);}catch(e){body.innerHTML=`<div class="empty">그리지 못했습니다: ${e.message}</div>`;console.error(p.id,e);}}save();}
+$('#monthly-share').onclick=async()=>{
+ save();const link=location.href;
+ try{await navigator.clipboard.writeText(link);$('#monthly-share-url').hidden=true;$('#monthly-action-status').textContent='선택 조건 링크를 복사했습니다.';}
+ catch(e){const input=$('#monthly-share-url');input.value=link;input.hidden=false;input.focus();input.select();$('#monthly-action-status').textContent='공유 주소를 직접 복사하세요.';}
+};
+$('#monthly-csv').onclick=()=>{
+ const rows=[['지역','가격 구분','주택 유형','기준월','지수','자료 상태','지수 기준','화면 자료 기준월','선택 기간','출처 파일','참고']];
+ for(const [type,label] of TYPES){
+  const source=D.index[state.mode+'_'+type],values=ser(source,state.region);
+  source.dates.slice(rangeStart(source.dates)).forEach(month=>{
+   const value=values?.[source.dates.indexOf(month)];
+   rows.push([state.region,M(),label,month,ok(value)?value:'',ok(value)?'관측값':'자료 없음','2026-01 = 100',D.asof,state.range,D.source,month==='2022-11'?'KB 표본 개편':'']);
+  });
+ }
+ const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';
+ const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=url;link.download='월간_주택지수.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ $('#monthly-action-status').textContent='선택 지역·매매/전세·기간의 4개 주택 유형 지수를 내려받았습니다. 지수는 거래가격(만원)이 아니며 결측값은 비워 둡니다.';
+};
+
 render();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",render);
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
