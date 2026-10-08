@@ -41,6 +41,7 @@ def publish(root, timeout=600):
                 raise SystemExit(f'{folder}: 미커밋 변경이 있습니다. 담당 변경을 먼저 커밋하세요.')
         if git(integration, 'branch', '--show-current') != 'main':
             raise SystemExit('통합 폴더가 main이 아닙니다. 브랜치를 자동 변경하지 않습니다.')
+        run(root, 'node', '--test', 'tests/market_analysis.test.cjs')
         run(root, 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-v')
         run(root, 'python3', '-B', 'scripts/kb_trades_dashboard.py', '--snapshot')
         if (root / 'scripts/market_overview.py').exists():
@@ -71,6 +72,13 @@ def publish(root, timeout=600):
                 if deploy and deploy['conclusion'] == 'success':
                     page = f'https://{repo.split("/")[0]}.github.io/{repo.split("/")[1]}/trades.html'
                     if f'name="build-commit" content="{sha}"' in get(page + '?v=' + sha):
+                        kb_pages = [page.replace('trades.html', name) for name in ('index.html', 'monthly.html')]
+                        analysis = (root / 'scripts/market_analysis.js').read_text(encoding='utf-8')
+                        kb_html = [get(url + '?v=' + sha) for url in kb_pages]
+                        if any(f'name="build-commit" content="{sha}"' not in html or analysis not in html for html in kb_html):
+                            time.sleep(20)
+                            continue
+                        print('주간·월간 화면 커밋 및 계산 모듈 게시 확인', flush=True)
                         if (root / 'scripts/market_overview.py').exists():
                             overview = page.replace('trades.html', 'overview.html')
                             page_html = get(overview + '?v=' + sha)

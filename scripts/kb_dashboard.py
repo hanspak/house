@@ -9,6 +9,7 @@
 
 월간 주택 시계열 파일이 있으면(로컬 kbdata/ 또는 --drive) 선택 지역 상세에 월간 지표 요약을 함께 넣는다.
 """
+from pathlib import Path
 import glob
 import json
 import os
@@ -76,13 +77,15 @@ def build(xlsx, monthly_xlsx=None):
         data["monthly"] = monthly_summary(monthly_xlsx)
     save_overview('weekly', data, ROOT)
     tpl = open(os.path.join(ROOT, "scripts", "dashboard_template.html"), encoding="utf-8").read()
-    html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    analysis = (Path(ROOT) / "scripts" / "market_analysis.js").read_text(encoding="utf-8")
+    html = tpl.replace("/*ANALYSIS*/", analysis).replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, f"kb_dashboard_{data['asof'].replace('-', '')}.html")
     # 브라우저에서 바로 열 수 있도록 문서 골격을 붙인다.
     page = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1"></head><body>'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<meta name="build-commit" content="{os.environ.get("GITHUB_SHA", "local")}"></head><body>'
             + html + "</body></html>")
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)

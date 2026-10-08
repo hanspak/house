@@ -41,7 +41,7 @@ GitHub Pages: https://hanspak.github.io/house/trades.html
 python3 -m http.server 8765 --directory dashboard
 ```
 
-원자료 수정 이력과 다른 화면의 계산 분리는 후속 작업이다.
+공개 집계 수정 이력은 `data_revisions.py`, 주간·월간 공통 계산은 `market_analysis.js`에서 관리한다.
 
 ## 관심 지역 종합
 
@@ -88,3 +88,19 @@ python3 scripts/market_overview.py
 ```
 
 기준일이 다른 실적·전망을 한 지표로 합산하지 않는다. 실제 입주 확인·신고 자료가 추가되면 별도 공급원을 만들고 정의와 공표 범위를 구분한다.
+
+
+## 주간·월간 계산 모듈
+
+`scripts/market_analysis.js`는 DOM·브라우저 저장소·통신에 의존하지 않는 공통 계산 모듈이다. 주간 상승률·2021~22 고점·국면·심리 정렬/백분위·이후 상승률·사이클 저점·확산도, 월간 변동률·날짜 정렬·단위 환산을 담당한다. HTML 템플릿은 선택 상태와 계산 함수 호출, 차트·표 표시를 담당한다. 화면용 정렬과 요약 문장 조립은 템플릿에 유지한다.
+
+두 Python 생성기는 `/*ANALYSIS*/` 자리에 같은 모듈을 포함한다. 별도 JS 요청이 없어 날짜별 보관 HTML과 직접 파일 열기도 동작한다. 생성된 HTML에 직접 수정하지 않고 모듈과 템플릿을 수정한다. Node.js 22 이상을 설치해 계산 검사를 실행한다(추가 npm 패키지는 필요 없다). Actions와 자동 배포 명령도 같은 검사를 실행한다.
+
+```sh
+node --test tests/market_analysis.test.cjs
+python3 -m unittest discover -s tests -v
+python3 scripts/kb_dashboard.py
+python3 scripts/kb_monthly_dashboard.py
+```
+
+이번 분리는 기존 산식과 표시 결과를 유지한다. 주간은 마지막 공통 기준주의 관측을 요구하고, 월간은 마지막 유효 관측을 기준으로 월 위치를 비교한다. 결측 비교 월을 건너뛰지 않는다. 심리 구간 대표값은 기존의 짝수 표본 상위 중앙값 관행을 유지했다. 산식·임계값을 바꾸는 경우 `tests/market_analysis.test.cjs`와 `docs/indicators.md`를 함께 변경하고 수치 변경을 별도 검토한다.

@@ -169,13 +169,14 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <div id="tip" hidden></div>
 
 <script>
+/*ANALYSIS*/
 const D = /*DATA*/;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const NS="http://www.w3.org/2000/svg";
 function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function txt(p,x,y,s,a={}){const t=el("text",{x,y,...a},p);t.textContent=s;return t;}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const ok=v=>v!=null&&isFinite(v);
+const ok=MarketAnalysis.ok;
 const fmt=(v,d=2)=>ok(v)?(v>0?"+":"")+v.toFixed(d):"–";
 const pct=(v,d=2)=>ok(v)?fmt(v,d)+"%":"–";
 const cls=v=>ok(v)?(v>0?"up":v<0?"down":""):"";
@@ -196,13 +197,9 @@ const short=k=>k.includes("|")?k.split("|")[1]:k;
 const SEN_NAME={"광주광역시":"(구)광주광역시","전라남도":"(구)전라남도"};
 const REGIONS=[...D.views.map(v=>v.id),"세종특별자치시","제주특별자치도"];
 const pk0=sd.findIndex(d=>d>="2021-01"),pk1=sd.findIndex(d=>d>="2023-01"),i21=pk0;
-const back=(a,w)=>{const i=N-1-w;return i>=0&&ok(a[i])&&ok(a[N-1])?(a[N-1]/a[i]-1)*100:NaN;};
-const ST={sale:{},jeonse:{}};
-for(const md of ["sale","jeonse"])for(const k of Object.keys(D.sale)){const a=PRICE[md][k],seg=a.slice(pk0,pk1),vals=seg.filter(ok),pv=vals.length?Math.max(...vals):NaN;
-  ST[md][k]={w1:back(a,1),w4:back(a,4),w12:back(a,12),w26:back(a,26),w52:back(a,52),idx:a[N-1],peak:pv,peakDate:ok(pv)?sd[pk0+seg.indexOf(pv)]:null,pk:ok(pv)?(a[N-1]/pv-1)*100:NaN,first:sd[a.findIndex(ok)]};}
-function senOn(key,region){const s=SEN[key],vals=s.values[SEN_NAME[region]||region];if(!vals)return null;
-  const t=s.dates.map(d=>Date.parse(d)),out=new Array(N).fill(null);let j=0;
-  for(let i=0;i<N;i++){const ti=Date.parse(sd[i]);while(j<t.length-1&&t[j+1]<=ti+3*864e5)j++;if(Math.abs(t[j]-ti)<=3*864e5)out[i]=vals[j];}return out;}
+const ST=MarketAnalysis.weeklyStats(sd,PRICE);
+function senOn(key,region){const s=SEN[key],vals=s.values[SEN_NAME[region]||region];
+  return vals?MarketAnalysis.alignNearby(sd,s.dates,vals):null;}
 
 // ---------- state ----------
 const state={region:"서울특별시",mode:"sale",group:"all",period:12,pick:{},range:"2021",sort:"pk",tsort:["spk",1],cmp:{},base:"peak",cycleTarget:"region"};
@@ -215,10 +212,7 @@ const kids=()=>{const v=V();if(!v)return [];return v.children.filter(k=>state.gr
 const pickOf=()=>{const v=V();if(!v)return null;const p=state.pick[v.id];return v.children.includes(p)?p:(v.children.find(k=>ok(STm()[k].pk))||v.children[0]);};
 const gIdx=k=>{const v=V();return v&&v.groupNames.length?v.groupNames.indexOf(v.groups[k]):0;};
 const gcol=k=>gIdx(k)===1?SER[1]:SER[0];
-function phase(k){const s=STm()[k],c=s[K()],ref=STm()[state.region][K()];
-  if(!ok(s.pk)||!ok(c))return "자료 부족";
-  if(s.pk<0)return c>=ref?"고점 아래 · 빠른 회복":c>0?"고점 아래 · 완만한 회복":"고점 아래 · 약세";
-  if(c<=0)return "고점 위 · 상승 멈춤";return c>=ref?"고점 위 · 상승 가속":"고점 위 · 상승 둔화";}
+const phase=k=>MarketAnalysis.phase(STm()[k],K(),STm()[state.region][K()]);
 function pick(k){state.pick[state.region]=k;render();}
 const noKids='<div class="empty">이 지역은 하위 지역 자료가 없습니다. 위에서 다른 지역을 고르세요.</div>';
 
@@ -352,7 +346,7 @@ def(4,"하위 지역 표","국면판","모든 수치를 정렬해서 비교",tru
 def(5,"주간 변동률 열지도","첫 시안 1","어느 지역이 언제부터 뜨거워졌고, 어디가 식고 있나",true,(box)=>{
   const v=V();if(!v)return box.innerHTML=noKids;
   const W=26,a=A(),st=STm(),list=kids().filter(c=>ok(st[c].w12)).sort((x,y)=>st[y].w12-st[x].w12);
-  const ch=(c,i)=>ok(a[c][i])&&ok(a[c][i-1])?(a[c][i]/a[c][i-1]-1)*100:NaN;
+  const ch=(c,i)=>MarketAnalysis.changeAt(a[c],i,1);
   const absv=list.flatMap(c=>Array.from({length:W},(_,k)=>Math.abs(ch(c,N-W+k)))).filter(ok).sort((x,y)=>x-y),lim=Math.max(.1,absv[Math.floor(absv.length*.95)]||.5);
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${M()} 전주 대비 % · 최근 26주 · ${state.period===12?"":"정렬은 "}12주 상승률 높은 순`;box.appendChild(sub);
   const lx=78,cw=30,chh=17,top=20,w=lx+W*cw+60,h=top+list.length*chh+4;
@@ -389,7 +383,7 @@ def(7,"시장 심리 계기판","분석 시안 1","지금 매수·전세 심리�
   const g_=document.createElement("div");g_.className="gauges";box.appendChild(g_);
   for(const [k,name,hint] of SKEYS){const s=SEN[k],vals=s.values[SEN_NAME[state.region]||state.region],g=document.createElement("div");g.className="gauge";g_.appendChild(g);
     if(!vals){g.innerHTML=`<div class="k">${name}</div><div class="empty">자료 없음</div>`;continue;}
-    const pairs=s.dates.map((d,i)=>[d,vals[i]]).filter(p=>ok(p[1])),all=pairs.map(p=>p[1]),cur=all[all.length-1],avg=all.reduce((a,b)=>a+b,0)/all.length,rank=all.filter(v=>v<cur).length/all.length*100;
+    const pairs=s.dates.map((d,i)=>[d,vals[i]]).filter(p=>ok(p[1])),{cur,avg,rank}=MarketAnalysis.sentimentSummary(vals);
     const st=rank>=80?["hot","높은 편"]:rank<=20?["cool","낮은 편"]:["norm","보통"];
     g.innerHTML=`<div class="k"><span>${name}</span><span class="pill ${st[0]}">백분위 ${rank.toFixed(0)} · ${st[1]}</span></div><div class="v">${cur.toFixed(1)}</div><div class="d">평균 ${avg.toFixed(1)} · ${hint}</div>`;
     const rec=pairs.filter(p=>p[0]>="2015"),d_=document.createElement("div");g.appendChild(d_);
@@ -400,14 +394,14 @@ def(8,"심리가 가격을 앞서는가","분석 시안 2","심리지수가 지�
   const sk=state.mode==="sale"?["buyer","매수우위지수"]:["jeonse_supply","전세수급지수"],b=senOn(sk[0],state.region),a=A()[state.region];
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(state.region)} · 점 1개 = 1주(2008~) · 가로 = ${sk[1]} · 세로 = 이후 12주 ${M()} 상승률`;box.appendChild(sub);
   if(!b||!a)return box.insertAdjacentHTML("beforeend",'<div class="empty">이 지역은 심리지수가 없습니다</div>');
-  const H=12,pts=[];for(let i=0;i<N-H;i++)if(ok(b[i])&&ok(a[i])&&ok(a[i+H]))pts.push([b[i],(a[i+H]/a[i]-1)*100,sd[i]]);
+  const pts=MarketAnalysis.forwardPoints(sd,a,b,12);
   const cur=b[N-1],w=560,h=320,m={l:46,r:14,t:14,b:34};
   const [x0,x1,xs]=nice(0,Math.max(...pts.map(p=>p[0]),cur),6),ys=pts.map(p=>p[1]),[y0,y1,yst]=nice(Math.min(...ys),Math.max(...ys),6);
   const X=v=>m.l+(v-x0)/(x1-x0)*(w-m.l-m.r),Y=v=>h-m.b-(v-y0)/(y1-y0)*(h-m.t-m.b);
   const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img","aria-label":"심리와 이후 상승률"},box);
   scatterAxes(svg,{X,Y,x0,x1,xs,y0,y1,ys:yst,m,w,h,xfmt:v=>v,yfmt:v=>(+v.toFixed(1))+"%"});
   const g=el("g",{},svg);pts.forEach(p=>el("circle",{cx:X(p[0]).toFixed(1),cy:Y(p[1]).toFixed(1),r:2.3,fill:SER[0],"fill-opacity":.33},g));
-  const bins=[];for(let lo=0;lo<200;lo+=10){const v=pts.filter(p=>p[0]>=lo&&p[0]<lo+10).map(p=>p[1]).sort((x,y)=>x-y);if(v.length>=15)bins.push([lo+5,v[Math.floor(v.length/2)],v.length,lo]);}
+  const bins=MarketAnalysis.sentimentBins(pts);
   el("path",{d:bins.map((q,i)=>(i?"L":"M")+X(q[0]).toFixed(1)+" "+Y(q[1]).toFixed(1)).join(""),fill:"none",stroke:css("--ink"),"stroke-width":2.2},svg);
   bins.forEach(q=>el("circle",{cx:X(q[0]),cy:Y(q[1]),r:3.5,fill:css("--ink"),stroke:css("--surface"),"stroke-width":1.5},svg));
   if(ok(cur)){el("line",{x1:X(cur),x2:X(cur),y1:m.t,y2:h-m.b,stroke:css("--ink-3"),"stroke-dasharray":"4 3"},svg);txt(svg,X(cur)+(X(cur)>w-110?-5:5),m.t+10,`이번 주 ${cur.toFixed(1)}`,{class:"strong","text-anchor":X(cur)>w-110?"end":"start"});}
@@ -422,9 +416,7 @@ def(8,"심리가 가격을 앞서는가","분석 시안 2","심리지수가 지�
   else f.textContent=`지금 수준과 비슷했던 주가 10주 미만이라 비교하기 어렵습니다.`;
 });
 
-function troughs(a){const out=[],W=52;for(let i=0;i<a.length;i++){if(!ok(a[i]))continue;const lo=Math.max(0,i-W),hi=Math.min(a.length-1,i+W);let isMin=true;
-  for(let j=lo;j<=hi;j++){if(ok(a[j])&&a[j]<a[i]){isMin=false;break;}}
-  if(isMin&&i+8<a.length&&(!out.length||i-out[out.length-1]>W)){const later=a.slice(i,Math.min(a.length,i+104)).filter(ok);if(Math.max(...later)/a[i]>1.03)out.push(i);}}return out;}
+const troughs=MarketAnalysis.troughs;
 def(9,"상승 사이클 비교","분석 시안 3","이번 상승은 과거 사이클보다 빠른가, 과거엔 몇 주차에 꺾였나",false,(box)=>{
   const r=pickTarget(),a=A()[r];const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(r)} · ${M()}지수 · 저점(앞뒤 1년 중 최저) = 100 · 최대 5년`;box.appendChild(sub);
   const tr=troughs(a).slice(-5);if(!tr.length)return box.insertAdjacentHTML("beforeend",'<div class="empty">뚜렷한 저점을 찾지 못했습니다</div>');
@@ -442,8 +434,7 @@ function pickTarget(){return state.cycleTarget==="pick"&&V()?pickOf():state.regi
 def(10,"상승 확산도","분석 시안 4","상승이 소수 지역에 몰렸나, 넓게 퍼졌나",false,(box)=>{
   const v=V();if(!v)return box.innerHTML=noKids;const list=kids(),a=A();
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(state.region)} 하위 지역 중 그 주에 ${M()}가 오른 비율 · 4주 평균 · 2008~`;box.appendChild(sub);
-  const raw=sd.map((_,i)=>{if(!i)return null;let up=0,n=0;for(const k of list){const s=a[k];if(ok(s[i])&&ok(s[i-1])){n++;if(s[i]>s[i-1])up++;}}return n>=2?up/n*100:null;});
-  const ma=raw.map((_,i)=>{const w=raw.slice(Math.max(0,i-3),i+1).filter(ok);return w.length===4?w.reduce((x,y)=>x+y,0)/4:null;});
+  const {average:ma}=MarketAnalysis.diffusion(a,list,N);
   const d_=document.createElement("div");box.appendChild(d_);
   lineChart(d_,{n:N,series:[{v:ma,c:SER[0],wd:1.5,end:true}],w:560,h:220,refs:[{y:50}],lo:0,hi:100,yfmt:v=>v.toFixed(0)+"%",xlab:yearLabels(sd),hover:i=>ok(ma[i])?`<b>${sd[i]}</b><br>오른 지역 ${ma[i].toFixed(0)}%`:null});
   const f=document.createElement("p");f.className="finding";f.innerHTML=`이번 주(4주 평균) <b>${ma[N-1].toFixed(0)}%</b>의 하위 지역(${list.length}곳 중)에서 ${M()}가 올랐습니다. 12주 전 ${ok(ma[N-13])?ma[N-13].toFixed(0)+"%":"–"}, 52주 전 ${ok(ma[N-53])?ma[N-53].toFixed(0)+"%":"–"}.`;box.appendChild(f);
@@ -473,7 +464,7 @@ def(12,"상승률 순위 변동","분석 시안 6","요즘 뜨는 지역은 언�
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`4주마다 ${P_}주 ${M()} 상승률 순위 · 최근 28주 · 이번 주 상위 8곳만 색`;box.appendChild(sub);
   if(list.length<4)return box.insertAdjacentHTML("beforeend",'<div class="empty">하위 지역이 4곳 미만입니다</div>');
   const steps=[];for(let s=7;s>=0;s--)steps.push(N-1-s*4);
-  const ch=(k,i)=>i-P_>=0&&ok(a[k][i])&&ok(a[k][i-P_])?(a[k][i]/a[k][i-P_]-1)*100:NaN;
+  const ch=(k,i)=>MarketAnalysis.changeAt(a[k],i,P_);
   const valid=list.filter(k=>steps.every(i=>ok(ch(k,i))));const rank={};valid.forEach(k=>rank[k]=[]);
   steps.forEach(i=>[...valid].sort((x,y)=>ch(y,i)-ch(x,i)).forEach((k,r)=>rank[k].push(r+1)));
   const top=[...valid].sort((x,y)=>rank[x][7]-rank[y][7]).slice(0,8),n=valid.length;
@@ -502,7 +493,7 @@ def(13,"지역 비교 차트","새 시안","고른 지역들을 같은 출발점
   list.forEach(c=>{const b=document.createElement("button"),i=chosen.indexOf(c);b.setAttribute("aria-pressed",i>=0);b.style.color=i>=0?SER[i]:"";
     b.innerHTML=(i>=0?`<i style="background:${SER[i]}"></i>`:"")+short(c);
     b.onclick=()=>{let ch_=[...chosen];if(ch_.includes(c))ch_=ch_.filter(x=>x!==c);else{if(ch_.length>=4)ch_.shift();ch_.push(c);}state.cmp[state.region]=ch_;render();};chips.appendChild(b);});
-  const dd=sd.slice(bi),series=chosen.map((c,i)=>{const s=a[c],b0=s[bi];return {v:dd.map((_,j)=>ok(s[bi+j])&&ok(b0)?s[bi+j]/b0*100:null),c:SER[i],end:true,label:short(c)};});
+  const dd=sd.slice(bi),series=chosen.map((c,i)=>{const s=a[c],b0=s[bi];return {v:MarketAnalysis.rebase(s,bi,dd.length),c:SER[i],end:true,label:short(c)};});
   const ends=series.map(s=>{let i=s.v.length-1;while(i>=0&&!ok(s.v[i]))i--;return i>=0?s.v[i]:null;});
   const r=lineChart($("#cmpchart"),{n:dd.length,series:series.map(s=>({...s,label:null})),w:1000,h:280,m:{l:40,r:120,t:10,b:24},refs:[{y:100,dash:"2 2"}],xlab:dd.length>60?yearLabels(dd):(svg,X,h)=>{},
     hover:i=>`<b>${dd[i]}</b><br>`+series.map(s=>`${s.label} ${ok(s.v[i])?s.v[i].toFixed(1):"–"}`).join("<br>")});
@@ -512,7 +503,7 @@ def(13,"지역 비교 차트","새 시안","고른 지역들을 같은 출발점
 });
 
 // ---------- 추천: 이번 주 요약 ----------
-const chgAt=(a,i,w)=>i-w>=0&&ok(a[i])&&ok(a[i-w])?(a[i]/a[i-w]-1)*100:NaN;
+const chgAt=MarketAnalysis.changeAt;
 const pkAt=(k,i)=>{const pv=STm()[k].peak;return ok(pv)&&ok(A()[k][i])?(A()[k][i]/pv-1)*100:NaN;};
 def(14,"이번 주 요약","추천","이번 주 숫자와 지난주·한 달 전 대비 달라진 점",true,(box)=>{
   const a=A(),r=state.region,st=STm()[r],m_=M(),list=V()?kids():[],k=K();

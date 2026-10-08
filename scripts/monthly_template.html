@@ -154,13 +154,14 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <div id="tip" hidden></div>
 
 <script>
+/*ANALYSIS*/
 const D = /*DATA*/;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const NS="http://www.w3.org/2000/svg";
 function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
 function txt(p,x,y,s,a={}){const t=el("text",{x,y,...a},p);t.textContent=s;return t;}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const ok=v=>v!=null&&isFinite(v);
+const ok=MarketAnalysis.ok;
 const fmt=(v,d=2)=>ok(v)?(v>0?"+":"")+v.toFixed(d):"–";
 const pct=(v,d=2)=>ok(v)?fmt(v,d)+"%":"–";
 const cls=v=>ok(v)?(v>0?"up":v<0?"down":""):"";
@@ -221,8 +222,8 @@ const hr=new URLSearchParams(location.hash.slice(1)).get("region");if(hr)state.r
 const save=()=>{try{localStorage.setItem("kb-monthly",JSON.stringify(state));}catch(e){}};
 const M=()=>MODE[state.mode];
 const ser=(obj,k)=>obj&&obj.values[k]?obj.values[k]:null;
-const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
-const chgN=(a,n)=>{if(!a)return NaN;const [v,i]=lastOk(a);return i-n>=0&&ok(a[i-n])?(v/a[i-n]-1)*100:NaN;};
+const lastOk=MarketAnalysis.lastOk;
+const chgN=MarketAnalysis.changeLatest;
 const won=v=>!ok(v)?"–":v>=10000?(v/10000).toFixed(2)+"억":Math.round(v).toLocaleString()+"만";
 function rangeStart(dates){return state.range==="all"?0:Math.max(0,dates.findIndex(d=>d>=(state.range==="2008"?"2008-01":String(+D.asof.slice(0,4)-5)+D.asof.slice(4))));}
 const monthLabels=(dates)=>(svg,X,h,m,w)=>{const y0=+dates[0].slice(0,4),y1=+dates[dates.length-1].slice(0,4),e=Math.max(1,Math.ceil((y1-y0+1)/7));
@@ -282,7 +283,7 @@ def(4,"선택 지역 평균·중위 가격 추이","실제 가격 수준이 어�
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${short(r)} 아파트·연립 ${M()} 평균(실선)과 중위(옅은 선) · 억 원`;box.appendChild(sub);
   if(!mean.values[r])return box.insertAdjacentHTML("beforeend",'<div class="empty">이 지역은 가격 자료가 없습니다</div>');
   const dates=mean.dates,i0=rangeStart(dates),dd=dates.slice(i0),mi=med.dates.indexOf(dd[0]);
-  const al=(arr,src)=>{if(!arr)return dd.map(()=>null);const off=src.dates.indexOf(dd[0]);return dd.map((d,j)=>{const k=src.dates.indexOf(d);return k>=0&&ok(arr[k])?arr[k]/10000:null;});};
+  const al=(arr,src)=>MarketAnalysis.alignExact(dd,src.dates,arr,10000);
   const series=[{v:al(mean.values[r].apt,mean),c:SER[0],end:true,n:"아파트 평균"},{v:al(med.values[r]?.apt,med),c:SER[0],op:.45,wd:1.5,n:"아파트 중위"},{v:al(mean.values[r].row,mean),c:SER[2],end:true,n:"연립 평균"},{v:al(med.values[r]?.row,med),c:SER[2],op:.45,wd:1.5,n:"연립 중위"}];
   const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:92,t:12,b:24},h=250;
   const res=lineChart(d_,{n:dd.length,series,w:560,h,m,yfmt:v=>v.toFixed(1),xlab:monthLabels(dd),hover:i=>`<b>${dd[i]}</b><br>`+series.map(s=>`${s.n} ${ok(s.v[i])?s.v[i].toFixed(2)+"억":"–"}`).join("<br>")});
@@ -366,7 +367,7 @@ def(10,"월세지수와 전월세전환율","월세는 얼마나 올랐고, 전�
 
 def(11,"KB 선도아파트 50","시가총액 상위 50개 단지가 전체 시장보다 앞서가나",false,(box)=>{
   const L=D.leading50,dd=L.dates,i0=rangeStart(dd),d=dd.slice(i0),lv=L.values["지수"].slice(i0);
-  const ix=D.index.sale_apt,al=k=>{const a=ix.values[k];return d.map(x=>{const j=ix.dates.indexOf(x);return j>=0?a[j]:null;});};
+  const ix=D.index.sale_apt,al=k=>{const a=ix.values[k];return MarketAnalysis.alignExact(d,ix.dates,a);};
   const series=[{v:lv,c:SER[1],end:true,wd:2.4,n:"선도 50"},{v:al("서울특별시"),c:SER[0],end:true,n:"서울 아파트"},{v:al("전국"),c:css("--ink-3"),end:true,n:"전국 아파트"}];
   const sub=document.createElement("p");sub.className="sub";sub.textContent="매매지수 · 2026-01 = 100 · 선도 50은 매년 12월 시가총액 상위 50개 단지";box.appendChild(sub);
   const d_=document.createElement("div");box.appendChild(d_);const m={l:36,r:100,t:10,b:24};
@@ -394,7 +395,7 @@ def(12,"오피스텔 권역 비교","권역마다 오피스텔 가격·전세가
 def(13,"오피스텔과 아파트 흐름","오피스텔 가격이 아파트를 따라가나, 따로 가나",false,(box)=>{
   if(!OT)return box.innerHTML=noOT;
   const r=otRegion(),dd=OT.index.dates,i0=Math.max(0,rangeStart(dd)),d=dd.slice(i0),ot=OT.index.values[r].slice(i0);
-  const ax=D.index.sale_apt,apt=ax.values[r]?d.map(x=>{const j=ax.dates.indexOf(x);return j>=0?ax.values[r][j]:null;}):null;
+  const ax=D.index.sale_apt,apt=ax.values[r]?MarketAnalysis.alignExact(d,ax.dates,ax.values[r]):null;
   const series=[{v:ot,c:SER[1],end:true,n:"오피스텔"},...(apt?[{v:apt,c:SER[0],end:true,n:"아파트"}]:[])];
   const sub=document.createElement("p");sub.className="sub";sub.textContent=`${r} 매매가격지수 · 2026-01 = 100 (두 지수 같은 기준) · 오피스텔은 2011년부터`;box.appendChild(sub);
   const d1=document.createElement("div");box.appendChild(d1);const m={l:36,r:96,t:10,b:24};

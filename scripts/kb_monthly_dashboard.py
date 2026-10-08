@@ -7,6 +7,7 @@
 결과: dashboard/monthly_YYYYMM.html (기준월), dashboard/monthly.html, dashboard/status.json(기준월 기록)
 오피스텔 파일이 없으면 오피스텔 화면만 '자료 없음'으로 나온다.
 """
+from pathlib import Path
 import glob
 import json
 import os
@@ -41,12 +42,14 @@ def build(housing, officetel=None):
         if not key.endswith("_apt"):
             v["values"] = {r: a for r, a in v["values"].items() if "|" not in r}
     tpl = open(os.path.join(ROOT, "scripts", "monthly_template.html"), encoding="utf-8").read()
-    html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    analysis = (Path(ROOT) / "scripts" / "market_analysis.js").read_text(encoding="utf-8")
+    html = tpl.replace("/*ANALYSIS*/", analysis).replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, f"monthly_{data['asof'].replace('-', '')}.html")
     page = ('<!doctype html><html lang="ko"><head><meta charset="utf-8">'
-            '<meta name="viewport" content="width=device-width,initial-scale=1"></head><body>'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<meta name="build-commit" content="{os.environ.get("GITHUB_SHA", "local")}"></head><body>'
             + html + "</body></html>")
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
