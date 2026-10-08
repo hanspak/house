@@ -41,4 +41,24 @@ GitHub Pages: https://hanspak.github.io/house/trades.html
 python3 -m http.server 8765 --directory dashboard
 ```
 
-준공 후 미분양·공급·임대차 수집, 원자료 수정 이력, 다른 화면의 계산 분리는 후속 작업이다.
+원자료 수정 이력과 다른 화면의 계산 분리는 후속 작업이다.
+
+## 관심 지역 종합
+
+`overview.html`은 전국·17개 시도·시군구의 가격, 거래 회복률, 임대차, 준공 후 미분양, 구매 부담을 함께 표시한다. 관심 지역 최대 6곳을 브라우저에 저장하고 비교·링크 공유·CSV 내려받기를 제공한다.
+
+주간·월간·실거래 생성기는 `scripts/overview_data.py`를 통해 `dashboard/overview-input/`에 표시용 자료를 저장한다. `scripts/market_overview.py`가 이를 공통 지표 형식(값·단위·기간·권역·설명)으로 통합하고 `overview_template.html`에 넣는다. 입력 JSON은 Pages에 게시하지 않는다. 시군구 KB 자료가 없으면 상위 지역 자료임을 표시한다.
+
+- `scripts/housing_supply.py`: 국토부 공식 엑셀의 전체·준공 후 미분양을 최근 6개월 추출한다.
+- `scripts/molit_rents.py`: 전국 아파트 전월세 최근 6개월을 월별 캐시에 저장하고 집계한다. 기존 매매용 키로 아파트 전월세 API 이용 권한도 필요하다.
+- `data/supply.json.gz`, `data/rents.json.gz`: 처음 게시할 때 쓰는 공개 집계. 인증키·아파트명·개별 계약을 넣지 않는다.
+- `cache/published/housing/`: 마지막 완전한 공급·전월세 집계. 예약 수집 후 다음 배포가 읽는다. 불완전한 전월세 수집은 게시 자료를 덮어쓰지 않는다.
+
+```sh
+python3 scripts/kb_dashboard.py
+python3 scripts/kb_monthly_dashboard.py
+python3 scripts/kb_trades_dashboard.py --snapshot
+python3 scripts/market_overview.py
+```
+
+사용자가 검증 후 자동 배포를 허용했다. 자신의 담당 변경을 커밋한 후 `python3 scripts/publish_dashboard.py`를 실행한다. 검사 → main fast-forward 통합 → push → Pages 및 공개 페이지의 커밋 일치 확인 순서다. 공통 Git 잠금으로 동시 배포를 막으며 미커밋 변경·분기 충돌 시 덮어쓰지 않고 중단한다.

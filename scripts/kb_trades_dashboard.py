@@ -22,6 +22,7 @@ from kb_status import update_status  # noqa: E402
 from trade_regions import PROVINCES, KB_NAMES, districts, normalize_trades, normalize_rone
 from trade_analysis import (aggregate_profiles, trade_recovery, source_dates,
                             ANALYSIS_VERSION, MIN_PRICE_SAMPLE, AREA_OPTIONS, AGE_OPTIONS)
+from overview_data import save as save_overview
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOW_PRICES = [10000, 15000, 20000]  # 만원: 1억, 1.5억, 2억 (목록에 담는 최대치는 2억)
@@ -154,6 +155,7 @@ def build_snapshot(path=None):
 
 
 def render(data):
+    save_overview('trades', {k: data[k] for k in ('months', 'collected', 'partial_from', 'agg', 'extra', 'recovery', 'sources') if k in data}, ROOT)
     data = dict(data)
     profiles = data.pop('profiles', {})
     out_dir = os.path.join(ROOT, 'dashboard')

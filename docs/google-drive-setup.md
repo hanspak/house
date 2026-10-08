@@ -102,7 +102,7 @@ python3 scripts/kb_drive.py --list                # 드라이브에 있는 KB �
 
 ### 주의
 
-- 무료 GitHub Pages 주소는 누구나 볼 수 있습니다. 화면에는 KB 공개 통계만 들어 있고, 키와 폴더 id는 들어가지 않습니다.
+- 무료 GitHub Pages 주소는 누구나 볼 수 있습니다. 화면에는 KB·국토부·부동산원·한국은행의 공개 통계와 표시용 거래 자료만 들어 있고, 키와 폴더 id는 들어가지 않습니다.
 - 키는 GitHub Secrets에만 저장되고, 실행 로그에는 `***`로 가려집니다. 실행이 끝나면 작업 공간의 키 파일도 지웁니다.
 - 실행이 실패하면 Actions 탭에서 빨간 표시를 눌러 로그를 보면 됩니다. 메시지별 원인은 위의 "문제 해결" 표와 같습니다.
 - **자료가 오래되면 알림 메일이 옵니다.** 주간 기준일이 14일, 월간 기준월이 2개월을 넘으면 화면은 그대로 올리고 마지막 `freshness` 작업만 실패시킵니다. 새 파일을 올리면 다음 실행부터 사라집니다. 현재 기준일은 `https://hanspak.github.io/house/status.json`에서도 볼 수 있습니다.
@@ -124,7 +124,30 @@ python3 scripts/kb_drive.py --list                # 드라이브에 있는 KB �
 | `RONE_KEY` | 한국부동산원 R-ONE Open API 인증키 | `rone` |
 | `ECOS_KEY` | 한국은행 ECOS Open API 인증키 | `ecos` |
 
-- GitHub: 저장소 **Settings → Secrets and variables → Actions**에 위 세 이름으로 등록합니다. 없으면 `trades.html`은 "키 등록 필요" 안내 페이지로 올라갑니다.
+- GitHub: 저장소 **Settings → Secrets and variables → Actions**에 위 세 이름으로 등록합니다. 누락된 키에 해당하는 갱신 작업은 실패하지만, 마지막 완전한 게시용 집계로 화면은 계속 게시됩니다.
 - 이 컴퓨터: `secrets/api_keys.json`에 `{"data_go_kr": "...", "rone": "...", "ecos": "..."}` 형식으로 둡니다(Git 제외).
-- 호출량: 첫 실행은 실거래 약 1,800회(서울 25개 구 × 24개월 × 3유형), 이후에는 최근 3개월만 다시 받아 하루 약 230회입니다. 지난 달 응답은 GitHub Actions 캐시(`cache/molit`)에 보관합니다.
+- 호출량: 전국 첫 실행은 286개 수집 코드 × 24개월 × 3유형으로 20,592개 지역·월·유형 조회입니다. 최근 3개월 재조회는 2,574개이며 결과가 많으면 페이지별 추가 호출이 있습니다. 지난 달 응답은 GitHub Actions 캐시(`cache/molit`)에 보관합니다.
 - 공공데이터포털이 요청 과다(429)로 막으면 기다렸다 다시 시도하고, 그래도 실패한 달은 다음 실행 때 다시 받습니다(화면 위쪽에 실패 건수 표시).
+
+## 관심 지역 종합과 공급·전월세 자동 갱신
+
+공개 주소: https://hanspak.github.io/house/overview.html
+
+종합 화면은 위 작업에서 생성한 주간·월간·실거래 자료와 마지막 완전한 공급·전월세 집계를 함께 읽습니다. 드라이브에 엑셀을 올리는 즉시 실행되지는 않습니다. 매일 09:00 KST 또는 수동 실행 때 최신 파일을 읽습니다. 코드 변경을 main에 푸시하면 화면을 자동 게시합니다.
+
+배포 후 별도 `housing` 작업에서 국토부 공식 미분양 엑셀(최대 5분)과 아파트 전월세 API(최대 20분)를 갱신합니다. 최근 6개월을 다루며, 전월세는 최근 3개월을 다시 받고 이전 월은 캐시를 재사용합니다. 집계는 캐시로 보존해 다음 배포에 반영합니다. 수집 시간 초과는 게시를 지연시키지 않습니다.
+
+전월세는 기존 `DATA_GO_KR_KEY`를 사용합니다. 공공데이터포털에서 **국토교통부 아파트 전월세 실거래가 자료** 활용 권한도 있어야 합니다. 공식 미분양 엑셀은 별도 인증키가 필요하지 않습니다. 최초 게시용 집계는 `data/supply.json.gz`, `data/rents.json.gz`에 포함되어 있습니다.
+
+로컬 갱신과 게시용 기본 자료 교체:
+
+```sh
+python3 scripts/housing_supply.py
+python3 scripts/molit_rents.py --months 6 --workers 8
+# 전월세 실패 0건인지 확인한 뒤 마지막 완전한 집계를 복사합니다.
+cp cache/published/housing/supply.json.gz data/supply.json.gz
+cp cache/published/housing/rents.json.gz data/rents.json.gz
+python3 scripts/market_overview.py
+```
+
+개발 변경은 검사·커밋 후 `python3 scripts/publish_dashboard.py`로 main에 통합하고 자동 게시합니다. 명령이 공개 페이지의 배포 커밋까지 확인합니다. Claude와 Codex에 매번 별도 배포 허락을 줄 필요는 없습니다.

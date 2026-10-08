@@ -18,6 +18,7 @@ import unicodedata
 sys.path.insert(0, os.path.dirname(__file__))
 from kb_monthly_extract import main as extract  # noqa: E402
 from kb_status import update_status  # noqa: E402
+from overview_data import save as save_overview
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,6 +35,7 @@ def build(housing, officetel=None):
         extract(housing, js, officetel)
         with open(js, encoding="utf-8") as f:
             data = json.load(f)
+    save_overview('monthly', data, ROOT)
     # 시 아래 구 단위는 아파트 지수만 쓰므로 나머지 유형은 시·도 이상만 남겨 파일 크기를 줄인다.
     for key, v in data["index"].items():
         if not key.endswith("_apt"):

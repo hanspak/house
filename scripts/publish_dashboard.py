@@ -41,6 +41,10 @@ def publish(root, timeout=600):
             raise SystemExit('통합 폴더가 main이 아닙니다. 브랜치를 자동 변경하지 않습니다.')
         run(root, 'python3', '-B', '-m', 'unittest', 'discover', '-s', 'tests', '-v')
         run(root, 'python3', '-B', 'scripts/kb_trades_dashboard.py', '--snapshot')
+        if (root / 'scripts/market_overview.py').exists():
+            run(root, 'python3', '-B', 'scripts/kb_dashboard.py')
+            run(root, 'python3', '-B', 'scripts/kb_monthly_dashboard.py')
+            run(root, 'python3', '-B', 'scripts/market_overview.py')
         run(root, 'git', 'diff', '--check')
         sha = git(root, 'rev-parse', 'HEAD')
         run(integration, 'git', 'fetch', 'origin', 'main')
@@ -65,6 +69,12 @@ def publish(root, timeout=600):
                 if deploy and deploy['conclusion'] == 'success':
                     page = f'https://{repo.split("/")[0]}.github.io/{repo.split("/")[1]}/trades.html'
                     if f'name="build-commit" content="{sha}"' in get(page + '?v=' + sha):
+                        if (root / 'scripts/market_overview.py').exists():
+                            overview = page.replace('trades.html', 'overview.html')
+                            if f'name="build-commit" content="{sha}"' not in get(overview + '?v=' + sha):
+                                time.sleep(20)
+                                continue
+                            print(f'종합 화면 게시 확인: {overview}', flush=True)
                         print(f'게시 확인: {page}\n커밋: {sha}\nActions: {workflow["html_url"]}', flush=True)
                         if any(j['name'] == 'freshness' and j['conclusion'] == 'failure' for j in jobs):
                             print('자료 기준일 점검 알림이 있습니다. 배포는 성공했습니다.', flush=True)

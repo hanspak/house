@@ -75,6 +75,16 @@ jobs:
       - name: 전국 실거래 화면 생성
         run: python scripts/kb_trades_dashboard.py --snapshot
 
+      - name: 마지막 공급·전월세 집계 복원
+        uses: actions/cache/restore@v4
+        with:
+          path: cache/published/housing
+          key: housing-published-${{ github.run_id }}
+          restore-keys: housing-published-
+
+      - name: 관심 지역 종합 화면 생성
+        run: python scripts/market_overview.py
+
       - name: 자료 기준일 점검
         id: fresh
         run: python scripts/kb_status.py check >> "$GITHUB_OUTPUT"
@@ -85,6 +95,7 @@ jobs:
           cp dashboard/latest.html _site/index.html
           cp dashboard/monthly.html _site/monthly.html
           cp dashboard/trades.html _site/trades.html
+          cp dashboard/overview.html _site/overview.html
           cp -R dashboard/trades-data _site/trades-data
           cp dashboard/kb_dashboard_*.html dashboard/monthly_*.html dashboard/status.json _site/
           touch _site/.nojekyll
@@ -184,3 +195,49 @@ jobs:
         with:
           path: cache/published
           key: trades-published-${{ github.run_id }}
+
+
+  housing:
+    # 공급·임대차 수집은 기존 실거래 수집과 독립 실행하여 게시를 지연시키지 않는다.
+    needs: deploy
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            cache/molit-rents
+            cache/supply
+            cache/published/housing
+          key: housing-${{ github.run_id }}
+          restore-keys: housing-
+      - name: 공식 미분양 갱신 (최대 5분)
+        continue-on-error: true
+        run: timeout --signal=TERM 5m python -u scripts/housing_supply.py
+      - name: 전국 전월세 갱신 (최대 20분)
+        continue-on-error: true
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: timeout --signal=TERM 20m python -u scripts/molit_rents.py --months 6 --workers 8
+      - name: 받은 공급·임대차 캐시 보존
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            cache/molit-rents
+            cache/supply
+            cache/published/housing
+          key: housing-${{ github.run_id }}
+      - name: 다음 배포용 공급·임대차 집계 보존
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: cache/published/housing
+          key: housing-published-${{ github.run_id }}

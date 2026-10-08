@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="build-commit" content="/*BUILD_SHA*/"><title>관심 지역 시장 종합</title>
+<style>
+:root{color-scheme:light dark;--bg:#f5f6f9;--surface:#fff;--ink:#202630;--muted:#667080;--line:#dce0e8;--up:#bb3940;--down:#326cbd;--accent:#285e90}
+@media(prefers-color-scheme:dark){:root{--bg:#171a20;--surface:#222630;--ink:#edf0f7;--muted:#a8b0c0;--line:#383f4d;--up:#f08b90;--down:#8cb7ef;--accent:#9bc9f5}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;line-height:1.6}.wrap{max-width:1240px;margin:auto;padding:28px 22px 60px}
+a{color:var(--accent)}button,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 12px}button{cursor:pointer}button:hover{border-color:var(--accent)}button[aria-pressed=true]{background:var(--ink);color:var(--surface)}button:focus-visible,a:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}nav{font-size:13px;margin-bottom:24px}nav a{border:1px solid var(--line);border-radius:30px;padding:4px 12px;text-decoration:none}nav a[aria-current]{background:var(--ink);color:var(--surface)}h1{font-size:30px;line-height:1.3;margin:8px 0}h2{font-size:20px;margin:28px 0 12px}.lede,.note,.label,.scope,.period{color:var(--muted)}.lede{max-width:840px}.note{font-size:13px}.controls{background:var(--surface);padding:14px;border:1px solid var(--line);border-radius:12px;margin:22px 0}.controls label{font-size:13px}.controls select{max-width:100%}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}.card h3{font-size:14px;margin:0;color:var(--muted);font-weight:500}.value{font-size:27px;font-weight:700;margin:5px 0}.period,.scope{font-size:12px}.card p{margin:5px 0;font-size:13px}.up{color:var(--up)}.down{color:var(--down)}.finding{padding:18px;background:var(--surface);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;margin:18px 0}.watch{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.watch button{font-size:13px}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}th,td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}tbody tr:last-child td{border-bottom:0}th{color:var(--muted);font-weight:500}td small{display:block;color:var(--muted);font-size:11px}.source{margin-top:32px}#status{min-height:20px}.actions{margin:16px 0}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.wrap{padding:22px 16px}.grid{grid-template-columns:minmax(0,1fr)}h1{font-size:26px}.card{padding:15px}.value{font-size:25px}}
+</style></head><body><main class="wrap">
+<nav aria-label="대시보드 이동"><a href="overview.html" aria-current="page">관심 지역 종합</a><a href="index.html">주간 아파트 국면판</a><a href="monthly.html">월간 주택 시장판</a><a href="trades.html">실거래·거래량·금리</a></nav>
+<p class="label">가격 · 거래 · 임대차 · 공급 · 구매 부담</p><h1><span id="region-name">전국</span> 시장 종합</h1>
+<p class="lede">관심 지역의 시장 흐름과 서로 다른 방향의 신호를 함께 살펴봅니다. 아파트 전체 면적·연식 기준이며 지표별 자료 기간과 권역이 다릅니다. 한 점수로 매수·매도를 판단하지 않습니다.</p>
+<div class="controls"><label for="province">시·도</label><select id="province"></select><label for="district">시·군·구</label><select id="district"></select><button id="star" type="button">관심 지역 추가</button></div>
+<div id="watch" class="watch" aria-label="관심 지역 목록"></div><p id="status" class="note" role="status" aria-live="polite"></p>
+<div class="actions"><button id="share" type="button">선택·관심 지역 링크 복사</button><button id="csv" type="button">관심 지역 CSV</button></div>
+<p class="finding" id="finding"></p><section class="grid" id="cards" aria-label="지역 지표"></section>
+<p class="note">붉은색·푸른색은 가격 변동의 방향입니다. 수익성이나 안전성을 뜻하지 않습니다. 전세가율은 지역 통계로 개별 매물의 보증금 안전성을 판정할 수 없습니다. 월세 중위액은 보증금·면적·연식 구성을 보정하지 않았습니다.</p>
+<div class="actions" id="details"></div>
+<h2>관심 지역 비교</h2><p class="note">각 값 아래 기준기간을 표시합니다. 시군구 지표가 없으면 상위 지역 자료임을 표시합니다. 관심 지역은 이 브라우저에 저장되며 최대 6곳입니다.</p>
+<div class="table-wrap"><table id="compare"></table></div>
+<h2>공급·임대차 추이</h2><p class="note">공급은 국토부 공식 미분양, 임대차는 신고된 아파트 계약 기준입니다. 표본 10건 미만의 가격은 비우며 최근 2개월 전월세는 집계 중입니다. 계약 건수 아래 신규·갱신·미확인 건수를 구분합니다.</p>
+<div class="grid"><div class="table-wrap"><table id="supply-trend"></table></div><div class="table-wrap"><table id="rent-trend"></table></div></div>
+<section class="source"><h2>자료 기준일</h2><p class="note">수집일과 자료 기준기간은 다릅니다. 전체 자료의 최신 기간이며, 개별 지역은 카드에 표시된 기간을 확인하세요.</p><div class="table-wrap"><table id="sources"></table></div></section>
+</main><script>
+const D=/*DATA*/;
+const $=s=>document.querySelector(s),valid=v=>typeof v==='number'&&Number.isFinite(v),label=r=>r.replace('|',' ');
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const definitions=[['price','매매지수 최근 4주'],['jeonse','전세지수 최근 4주'],['recovery','아파트 거래 회복률'],['trade_price','최근 3개월 실거래 중위'],['completed','준공 후 미분양'],['supply_share','미분양 중 준공 후 비중'],['rent_deposit','전세 보증금 중위'],['monthly_rent','월세 중위액'],['jeonse_ratio','KB 전세가율'],['hai','주택구매력지수 HAI'],['rate','주택담보대출 금리']];
+let state={region:'전국',watch:['서울','경기','부산']};
+try{const saved=JSON.parse(localStorage.getItem('house-overview')||'{}');if(D.regions.includes(saved.region))state.region=saved.region;if(Array.isArray(saved.watch))state.watch=saved.watch;}catch{}
+const hash=new URLSearchParams(location.hash.slice(1));if(D.regions.includes(hash.get('region')))state.region=hash.get('region');if(hash.has('watch'))state.watch=hash.get('watch').split(',');
+state.watch=[...new Set(state.watch)].filter(r=>D.regions.includes(r)).slice(0,6);
+function format(m,key){if(!valid(m?.value))return '–';if(m.unit==='만원')return m.value>=10000?(m.value/10000).toFixed(2)+'억':Math.round(m.value).toLocaleString()+'만';if(m.unit==='호')return Math.round(m.value).toLocaleString()+'호';const sign=['price','jeonse'].includes(key)&&m.value>0?'+':'';return sign+m.value.toLocaleString(undefined,{maximumFractionDigits:2})+m.unit;}
+function select(region){state.region=region;render();}
+function render(){
+ const province=state.region.split('|')[0];$('#region-name').textContent=label(state.region);
+ const p=$('#province');if(!p.options.length)['전국',...D.provinces].forEach(r=>p.add(new Option(r,r)));p.value=province;p.onchange=()=>select(p.value);
+ const d=$('#district');d.replaceChildren();d.add(new Option('전체',province));(D.districts[province]||[]).forEach(r=>d.add(new Option(r.split('|')[1],r)));d.value=state.region;d.disabled=province==='전국';d.onchange=()=>select(d.value);
+ const watched=state.watch.includes(state.region);$('#star').textContent=watched?'관심 지역 해제':'관심 지역 추가';$('#star').setAttribute('aria-pressed',String(watched));
+ $('#watch').replaceChildren();state.watch.forEach(r=>{const b=document.createElement('button');b.textContent=label(r);b.setAttribute('aria-pressed',String(r===state.region));b.onclick=()=>select(r);$('#watch').appendChild(b);});
+ const metrics=D.metrics[state.region];
+ $('#cards').innerHTML=definitions.map(([key,title])=>{const m=metrics[key];const color=['price','jeonse'].includes(key)&&valid(m.value)?(m.value>0?'up':m.value<0?'down':''):'';return `<article class="card"><h3>${title}</h3><div class="value ${color}">${esc(format(m,key))}</div><div class="period">${esc(m.period||'자료 없음')}</div><div class="scope">${esc(m.scope?label(m.scope):'권역 자료 없음')}</div><p>${esc(m.note)}</p></article>`;}).join('');
+ const parts=[];for(const [key,title] of [['price','매매'],['jeonse','전세']]){const v=metrics[key].value;parts.push(valid(v)?`${title}지수는 최근 4주 ${v>0?'상승':v<0?'하락':'보합'}입니다.`:`${title}지수 자료가 없습니다.`);}const r=metrics.recovery.value;parts.push(valid(r)?`아파트 거래량은 과거 동기간 평균의 ${r.toFixed(1)}%입니다.`:'거래 회복률을 계산할 자료가 부족합니다.');parts.push('가격·거래·공급 자료의 기간을 함께 확인하세요.');$('#finding').textContent=parts.join(' ');
+ const rows=state.watch.length?state.watch:[state.region],cols=['price','jeonse','recovery','completed','jeonse_ratio'];
+ $('#compare').innerHTML='<thead><tr><th>지역</th>'+cols.map(k=>'<th>'+definitions.find(x=>x[0]===k)[1]+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td><button data-region="'+esc(r)+'">'+esc(label(r))+'</button></td>'+cols.map(k=>{const m=D.metrics[r][k];return '<td>'+esc(format(m,k))+'<small>'+esc(m.period||'자료 없음')+(m.note==='상위 지역 자료'?' · '+esc(m.scope):'')+'</small></td>';}).join('')+'</tr>').join('')+'</tbody>';
+ $('#compare').querySelectorAll('button').forEach(b=>b.onclick=()=>select(b.dataset.region));
+ const supply=D.supply?.values[state.region];$('#supply-trend').innerHTML='<thead><tr><th>월</th><th>전체 미분양</th><th>준공 후</th></tr></thead><tbody>'+(supply?D.supply.months.map((m,i)=>'<tr><td>'+m+'</td><td>'+esc(format({value:supply.total[i],unit:'호'}))+'</td><td>'+esc(format({value:supply.completed[i],unit:'호'}))+'</td></tr>').join(''):'<tr><td colspan="3">선택 지역의 공급 자료 없음</td></tr>')+'</tbody>';
+ const rent=D.rents?.values[state.region];const rentDate=D.sources.find(s=>s.name==='국토부 전월세')?.collected;const rentMonth=rentDate?rentDate.slice(0,7):null;const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));$('#rent-trend').innerHTML='<thead><tr><th>월</th><th>계약</th><th>전세 중위 보증금</th><th>월세 중위액</th></tr></thead><tbody>'+(rent?D.rents.months.map((m,i)=>'<tr><td>'+m+(rentMonth&&serial(m)>=serial(rentMonth)-1?' · 집계 중':'')+'</td><td>'+esc(valid(rent.n[i])?rent.n[i].toLocaleString()+'건':'–')+(valid(rent.n[i])?'<small>신규 '+esc(rent.new_n[i])+' · 갱신 '+esc(rent.renewal_n[i])+' · 미확인 '+esc(rent.unknown_n[i])+'</small>':'')+'</td><td>'+esc(format({value:rent.deposit[i],unit:'만원'}))+'</td><td>'+esc(format({value:rent.rent[i],unit:'만원/월'}))+'</td></tr>').join(''):'<tr><td colspan="4">선택 지역의 임대차 자료 없음</td></tr>')+'</tbody>';
+ const kb=D.kb_names[province]||'전국';$('#details').innerHTML=`<a href="index.html#view=${encodeURIComponent(kb)}">주간 권역 상세</a><a href="monthly.html#region=${encodeURIComponent(kb)}">월간 권역 상세</a><a href="trades.html#gu=${encodeURIComponent(state.region)}">실거래 상세</a>`;
+ $('#sources').innerHTML='<thead><tr><th>자료</th><th>최신 기간</th><th>수집일</th></tr></thead><tbody>'+D.sources.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+esc(s.period||'–')+'</td><td>'+esc(s.collected||'기록 없음')+'</td></tr>').join('')+'</tbody>';
+ try{localStorage.setItem('house-overview',JSON.stringify(state));}catch{}
+ history.replaceState(null,'','#'+new URLSearchParams({region:state.region,watch:state.watch.join(',')}));
+}
+$('#star').onclick=()=>{if(state.watch.includes(state.region))state.watch=state.watch.filter(r=>r!==state.region);else if(state.watch.length>=6){$('#status').textContent='관심 지역은 최대 6곳입니다. 기존 지역을 해제한 뒤 추가하세요.';return;}else state.watch.push(state.region);$('#status').textContent='관심 지역을 저장했습니다.';render();};
+$('#share').onclick=async()=>{try{await navigator.clipboard.writeText(location.href);$('#status').textContent='선택 조건과 관심 지역 링크를 복사했습니다.';}catch{$('#status').textContent='주소창의 링크를 복사해 공유할 수 있습니다.';}};
+$('#csv').onclick=()=>{const rows=[['지역','지표','값','단위','기간','권역','설명']];for(const r of state.watch.length?state.watch:[state.region])for(const [key,title] of definitions){const m=D.metrics[r][key];rows.push([label(r),title,m.value??'',m.unit,m.period??'',m.scope??'',m.note]);}const encode=v=>'"'+String(v).replace(/"/g,'""')+'"';const blob=new Blob(['\uFEFF'+rows.map(row=>row.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='관심지역_시장지표.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+render();
+</script></body></html>

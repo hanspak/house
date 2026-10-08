@@ -20,6 +20,7 @@ import unicodedata
 sys.path.insert(0, os.path.dirname(__file__))
 from kb_extract import main as extract  # noqa: E402
 from kb_status import update_status  # noqa: E402
+from overview_data import save as save_overview
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -73,6 +74,7 @@ def build(xlsx, monthly_xlsx=None):
             data = json.load(f)
     if monthly_xlsx:
         data["monthly"] = monthly_summary(monthly_xlsx)
+    save_overview('weekly', data, ROOT)
     tpl = open(os.path.join(ROOT, "scripts", "dashboard_template.html"), encoding="utf-8").read()
     html = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
