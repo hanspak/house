@@ -101,6 +101,8 @@ class PublicationVerificationTests(unittest.TestCase):
         for name, module in [('trades.html', 'profile_loader.js'), ('index.html', 'market_analysis.js'), ('monthly.html', 'market_analysis.js'), ('overview.html', 'overview_comparison.js')]:
             (self.root / 'scripts' / module).write_text(module, encoding='utf-8')
             self.pages[name] = f'<meta name="build-commit" content="{self.sha}">' + module
+        (self.root / 'scripts/trade_composition.js').write_text('composition-module')
+        self.pages['trades.html'] += 'composition-module'
         self.pages['overview.html'] += json.dumps({'revision_file': f'overview-data/revisions.{self.digest}.json'}, separators=(',', ':'))
 
     def read_public(self, url, deadline=None):
