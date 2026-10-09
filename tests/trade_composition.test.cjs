@@ -65,3 +65,29 @@ test('monthly missing groups, short arrays and inconsistent sums are held',()=>{
  }
  assert(C.partition(10,[1,2]).every(r=>r.share===null));
 });
+test('selected month uses exact year-ago calendar month despite gaps',()=>{
+ const months=['2024-01','2025-02','2026-01','2026-02'];
+ const obs=C.monthly([100,100,100,100],[[10,20,30,40],[20,30,30,20],[30,20,20,10]]);
+ const r=C.compareMonth(months,obs,3);assert.equal(r.previousIndex,1);assert.equal(r.previousMonth,'2025-02');assert.equal(r.rows[0].delta,20);
+ const missing=C.compareMonth(months,obs,2);assert.equal(missing.previousIndex,-1);assert.equal(missing.rows[0].share,30);assert(missing.rows.every(r=>r.delta===null&&r.previous===null&&r.comparisonStatus==='전년 동월 자료 없음'));
+ assert.equal(C.compareMonth(months,obs,-1),null);assert.equal(C.compareMonth(months,obs,4),null);
+});
+test('small monthly samples retain observations but hold year-ago change',()=>{
+ const obs=C.monthly([10,9],[[1,1],[3,3],[3,3]]),r=C.compareMonth(['2025-01','2026-01'],obs,1);
+ assert.equal(r.rows[0].share,100/9);assert.equal(r.rows[0].previousShare,10);
+ assert(r.rows.every(r=>r.delta===null&&r.comparisonStatus.includes('10건')));
+ const enough=C.compareMonth(['2025-01','2026-01'],C.monthly([10,10],[[1,1],[3,3],[3,3]]),1);
+ assert(enough.rows.every(r=>r.delta===0&&r.comparisonStatus==='비교 가능'));
+});
+test('missing year-ago observations differ from months outside history',()=>{
+ const obs=C.monthly([null,100],[[null,30],[null,30],[null,30]]),r=C.compareMonth(['2025-01','2026-01'],obs,1);
+ assert.equal(r.previousIndex,0);assert(r.rows.every(r=>r.delta===null&&r.comparisonStatus.includes('전년: 자료 누락')));
+});
+test('zero and invalid selected-month totals retain counts and hold comparisons',()=>{
+ for(const groups of [[[0,1],[0,1],[0,1]],[[10,1],[10,1],[10,1]]]){
+  const obs=C.monthly([0,10],groups),r=C.compareMonth(['2025-01','2026-01'],obs,1);
+  assert(r.rows.every(r=>r.delta===null&&r.comparisonStatus!=='비교 가능'));
+ }
+ const r=C.compareMonth(['2025-01','2026-01'],C.monthly([10,0],[[1,0],[3,0],[3,0]]),1);
+ assert(r.rows.every(r=>r.n===0&&r.delta===null&&r.comparisonStatus.includes('선택 월: 거래 0건')));
+});

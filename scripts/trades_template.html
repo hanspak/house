@@ -575,20 +575,25 @@ function renderCompositionMonths(box,axes,g,k,current){
  box.querySelector('#composition-monthly-table tbody').innerHTML=rows.map(rowHTML).join('');
  box.querySelector('#composition-monthly-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일'],...rows.map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected])],'실거래_월별거래구성.csv');};
  const detail=document.createElement('div');detail.id='composition-month-selection';
- detail.innerHTML='<h4>선택 월 상세</h4><p class="note">그래프를 누르거나 월 선택·이전·다음 버튼으로 확인하세요. 처음에는 최근 3개월 비교의 마지막 월을 표시합니다. 선택 월 변경은 전체 월별 CSV 범위를 바꾸지 않습니다.</p><div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><button type="button" id="composition-month-prev" aria-label="이전 계약월">이전</button><label for="composition-month">계약월</label><select id="composition-month"></select><button type="button" id="composition-month-next" aria-label="다음 계약월">다음</button><button type="button" id="composition-selected-csv">선택 월 거래 구성 CSV</button></div><p class="note" id="composition-selected-status" role="status" aria-live="polite"></p><div class="tbl"><table id="composition-selected-table"><thead><tr><th>계약월</th><th>분류</th><th>구간</th><th>전체 건수</th><th>구간 건수</th><th>비중</th><th>자료 상태</th><th>신고 상태</th></tr></thead><tbody></tbody></table></div>';
+ detail.innerHTML='<h4>선택 월 상세</h4><p class="note">그래프를 누르거나 월 선택·이전·다음 버튼으로 확인하세요. 처음에는 최근 3개월 비교의 마지막 월을 표시합니다. 선택 월 변경은 전체 월별 CSV 범위를 바꾸지 않습니다. 전년 같은 달의 구간 비중과 비교하며, 양쪽 월 전체 거래가 각각 10건 이상일 때만 변화(%p)를 표시합니다. 이는 표시 기준이며 통계적 신뢰도를 뜻하지 않습니다.</p><div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><button type="button" id="composition-month-prev" aria-label="이전 계약월">이전</button><label for="composition-month">계약월</label><select id="composition-month"></select><button type="button" id="composition-month-next" aria-label="다음 계약월">다음</button><button type="button" id="composition-selected-csv">선택 월 거래 구성 CSV</button></div><p class="note" id="composition-selected-status" role="status" aria-live="polite"></p><div class="tbl"><table id="composition-selected-table"><thead><tr><th>계약월</th><th>분류</th><th>구간</th><th>전체 건수</th><th>구간 건수</th><th>비중</th><th>전년 구간 건수</th><th>전년 비중</th><th>변화(%p)</th><th>비교 상태</th><th>자료 상태</th><th>신고 상태</th></tr></thead><tbody></tbody></table></div>';
  charts.after(detail);
  const select=detail.querySelector('#composition-month'),prev=detail.querySelector('#composition-month-prev'),next=detail.querySelector('#composition-month-next');
  MS.forEach((month,i)=>select.add(new Option(month+(partial(month)?' (집계 중)':''),String(i))));
  let selected=last3.length===3?last3[2]:MS.length-1;
+ const selectedRows=i=>{
+  const comparisons=axes.map(a=>TradeComposition.compareMonth(MS,a.months,i));
+  return rows.filter(r=>r.month===MS[i]).map((r,j)=>({...r,...comparisons[Math.floor(j/4)].rows[j%4],status:r.status,previousMonth:comparisons[Math.floor(j/4)].previousMonth,previousTotal:comparisons[Math.floor(j/4)].previousTotal}));
+ };
  function choose(i){
   if(!current()||!Number.isInteger(i)||i<0||i>=MS.length)return;
   selected=i;select.value=String(i);prev.disabled=i===0;next.disabled=i===MS.length-1;
-  detail.querySelector('tbody').innerHTML=rows.filter(r=>r.month===MS[i]).map(rowHTML).join('');
-  detail.querySelector('#composition-selected-status').textContent=regionLabel(g)+' · '+TN[k]+' · '+MS[i]+' · 전체 '+count(axes[0].months[i].total)+'건 · '+(partial(MS[i])?'신고 집계 중':'일반 집계')+axes.map(a=>a.months[i].status?' · '+a.axis+': '+a.months[i].status:'').join('');
+  const selectedData=selectedRows(i);
+  detail.querySelector('tbody').innerHTML=selectedData.map(r=>`<tr><td>${r.month}</td><td>${r.axis}</td><td>${r.label}</td><td>${count(r.total)}</td><td>${count(r.n)}</td><td>${share(r.share)}</td><td>${count(r.previous)}</td><td>${share(r.previousShare)}</td><td>${ok(r.delta)?(r.delta>0?'+':'')+r.delta.toFixed(1):'–'}</td><td>${r.comparisonStatus}</td><td>${r.status}</td><td>${r.report}</td></tr>`).join('');
+  detail.querySelector('#composition-selected-status').textContent=regionLabel(g)+' · '+TN[k]+' · '+MS[i]+' · 전체 '+count(axes[0].months[i].total)+'건 · 전년 동월 '+selectedData[0].previousMonth+' 전체 '+count(selectedData[0].previousTotal)+'건 · '+(partial(MS[i])?'신고 집계 중':'일반 집계')+axes.map(a=>a.months[i].status?' · '+a.axis+': '+a.months[i].status:'').join('');
   markers.forEach(({marker,X})=>{marker.setAttribute('x1',X(i));marker.setAttribute('x2',X(i));});
  }
  select.onchange=()=>choose(Number(select.value));prev.onclick=()=>choose(selected-1);next.onclick=()=>choose(selected+1);
- detail.querySelector('#composition-selected-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일'],...rows.filter(r=>r.month===MS[selected]).map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected])],'실거래_거래구성_'+MS[selected]+'.csv');};
+ detail.querySelector('#composition-selected-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일','전년 계약월','전년 전체 거래 건수','전년 구간 거래 건수','전년 비중(%)','비중 변화(%p)','비교 상태'],...selectedRows(selected).map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected,r.previousMonth,r.previousTotal,r.previous,r.previousShare,r.delta,r.comparisonStatus])],'실거래_거래구성_'+MS[selected]+'.csv');};
  choose(selected);
 }
 function compositionRegions(stats,regions,k){

@@ -31,5 +31,16 @@
    return {total:n,groups,status:groups[0].status||(n<10?'전체 거래 10건 미만: 비중 변동 주의':'')};
   });
  }
- return Object.freeze({total,partition,compare,largestChange,monthly});
+ function compareMonth(months,observations,index){
+  if(!Number.isInteger(index)||index<0||index>=months.length||!/^\d{4}-(0[1-9]|1[0-2])$/.test(months[index]))return null;
+  const previousMonth=String(Number(months[index].slice(0,4))-1).padStart(4,'0')+months[index].slice(4),previousIndex=months.indexOf(previousMonth);
+  const now=observations[index],old=previousIndex<0?null:observations[previousIndex];
+  const counts=o=>Array.from({length:3},(_,i)=>o?.groups?.[i]?.n??null);
+  const rows=compare(now?.total??null,old?.total??null,counts(now),counts(old)).map(r=>{
+   const reason=previousIndex<0?'전년 동월 자료 없음':r.status.replace('최근:','선택 월:')||(now.total<10||old?.total<10?'양쪽 월 전체 거래 각각 10건 이상일 때 비교':'');
+   return {...r,delta:reason?null:r.delta,comparisonStatus:reason||'비교 가능'};
+  });
+  return {previousMonth,previousIndex,previousTotal:old?.total??null,rows};
+ }
+ return Object.freeze({total,partition,compare,largestChange,monthly,compareMonth});
 });
