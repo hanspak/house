@@ -553,7 +553,7 @@ function compositionMonths(stats,g,k){
 function renderCompositionMonths(box,axes,g,k,current){
  const share=v=>ok(v)?v.toFixed(1)+'%':'–';
  box.innerHTML='<h3>월별 거래 구성 추이</h3><p class="note">'+regionLabel(g)+' · '+TN[k]+' · '+MS[0]+'~'+MS[MS.length-1]+' · 전체 면적·연식 · 월별 전체 거래가 분모입니다. 0건·누락은 비중을 비우고 선을 연결하지 않습니다. 10건 미만인 월은 비중 변동에 주의하세요. 음영은 신고 집계 중인 달이며 추후 달라질 수 있습니다.</p><button type="button" id="composition-monthly-csv">월별 거래 구성 CSV</button><div class="grid" id="composition-monthly-charts"></div><details><summary>월별 건수·비중 표 보기</summary><div class="tbl"><table id="composition-monthly-table"><thead><tr><th>계약월</th><th>분류</th><th>구간</th><th>전체 건수</th><th>구간 건수</th><th>비중</th><th>자료 상태</th><th>신고 상태</th></tr></thead><tbody></tbody></table></div></details>';
- const charts=box.querySelector('#composition-monthly-charts');
+ const charts=box.querySelector('#composition-monthly-charts'),markers=[];
  axes.forEach(a=>{
   const chart=document.createElement('div');charts.appendChild(chart);
   const heading=document.createElement('h4');heading.textContent=a.axis+'별 거래 비중';chart.appendChild(heading);
@@ -564,11 +564,32 @@ function renderCompositionMonths(box,axes,g,k,current){
   r.svg.setAttribute('aria-label',regionLabel(g)+' '+TN[k]+' '+a.axis+'별 월별 거래 비중, 상세 수치는 아래 표 참조');
   series.forEach(s=>s.v.forEach((v,i)=>{if(ok(v))el('circle',{cx:r.X(i),cy:r.Y(v),r:2,fill:s.c,'pointer-events':'none'},r.svg);}));
   const pi=MS.findIndex(partial);if(pi>=0&&r.lo!==undefined)el('rect',{x:r.X(pi)-4,y:m.t,width:r.X(MS.length-1)-r.X(pi)+8,height:h-m.t-m.b,fill:css('--ink-3'),opacity:.1,'pointer-events':'none'},r.svg);
+  if(r.lo!==undefined){
+   const marker=el('line',{y1:m.t,y2:h-m.b,stroke:css('--accent'),'stroke-width':1.5,'stroke-dasharray':'3 3','pointer-events':'none'},r.svg);markers.push({marker,X:r.X});
+   r.svg.addEventListener('click',e=>{if(!current())return;const b=r.svg.getBoundingClientRect();if(!b.width)return;const x=(e.clientX-b.left)/b.width*w;if(x<m.l||x>w-m.r)return;choose(Math.round((x-m.l)/(w-m.l-m.r)*(MS.length-1)));hideTip();});
+  }
   const legend=document.createElement('div');legend.className='legend';legend.innerHTML=series.map(s=>`<span><i style="background:${s.c}"></i>${s.n}</span>`).join('');chart.appendChild(legend);
  });
  const rows=MS.flatMap((month,i)=>axes.flatMap(a=>a.months[i].groups.map((r,j)=>({month,axis:a.axis,label:a.labels[j],total:a.months[i].total,...r,status:a.months[i].status||'비중 확인 가능',report:partial(month)?'집계 중':'일반 집계'}))));
- box.querySelector('tbody').innerHTML=rows.map(r=>`<tr><td>${r.month}</td><td>${r.axis}</td><td>${r.label}</td><td>${count(r.total)}</td><td>${count(r.n)}</td><td>${share(r.share)}</td><td>${r.status}</td><td>${r.report}</td></tr>`).join('');
+ const rowHTML=r=>`<tr><td>${r.month}</td><td>${r.axis}</td><td>${r.label}</td><td>${count(r.total)}</td><td>${count(r.n)}</td><td>${share(r.share)}</td><td>${r.status}</td><td>${r.report}</td></tr>`;
+ box.querySelector('#composition-monthly-table tbody').innerHTML=rows.map(rowHTML).join('');
  box.querySelector('#composition-monthly-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일'],...rows.map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected])],'실거래_월별거래구성.csv');};
+ const detail=document.createElement('div');detail.id='composition-month-selection';
+ detail.innerHTML='<h4>선택 월 상세</h4><p class="note">그래프를 누르거나 월 선택·이전·다음 버튼으로 확인하세요. 처음에는 최근 3개월 비교의 마지막 월을 표시합니다. 선택 월 변경은 전체 월별 CSV 범위를 바꾸지 않습니다.</p><div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><button type="button" id="composition-month-prev" aria-label="이전 계약월">이전</button><label for="composition-month">계약월</label><select id="composition-month"></select><button type="button" id="composition-month-next" aria-label="다음 계약월">다음</button><button type="button" id="composition-selected-csv">선택 월 거래 구성 CSV</button></div><p class="note" id="composition-selected-status" role="status" aria-live="polite"></p><div class="tbl"><table id="composition-selected-table"><thead><tr><th>계약월</th><th>분류</th><th>구간</th><th>전체 건수</th><th>구간 건수</th><th>비중</th><th>자료 상태</th><th>신고 상태</th></tr></thead><tbody></tbody></table></div>';
+ charts.after(detail);
+ const select=detail.querySelector('#composition-month'),prev=detail.querySelector('#composition-month-prev'),next=detail.querySelector('#composition-month-next');
+ MS.forEach((month,i)=>select.add(new Option(month+(partial(month)?' (집계 중)':''),String(i))));
+ let selected=last3.length===3?last3[2]:MS.length-1;
+ function choose(i){
+  if(!current()||!Number.isInteger(i)||i<0||i>=MS.length)return;
+  selected=i;select.value=String(i);prev.disabled=i===0;next.disabled=i===MS.length-1;
+  detail.querySelector('tbody').innerHTML=rows.filter(r=>r.month===MS[i]).map(rowHTML).join('');
+  detail.querySelector('#composition-selected-status').textContent=regionLabel(g)+' · '+TN[k]+' · '+MS[i]+' · 전체 '+count(axes[0].months[i].total)+'건 · '+(partial(MS[i])?'신고 집계 중':'일반 집계')+axes.map(a=>a.months[i].status?' · '+a.axis+': '+a.months[i].status:'').join('');
+  markers.forEach(({marker,X})=>{marker.setAttribute('x1',X(i));marker.setAttribute('x2',X(i));});
+ }
+ select.onchange=()=>choose(Number(select.value));prev.onclick=()=>choose(selected-1);next.onclick=()=>choose(selected+1);
+ detail.querySelector('#composition-selected-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일'],...rows.filter(r=>r.month===MS[selected]).map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected])],'실거래_거래구성_'+MS[selected]+'.csv');};
+ choose(selected);
 }
 function compositionRegions(stats,regions,k){
  return regions.flatMap(g=>{
