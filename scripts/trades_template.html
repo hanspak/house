@@ -156,6 +156,8 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <p class="note" id="trade-action-status" role="status" aria-live="polite"></p>
 <section class="controls" style="position:static" aria-label="저장한 실거래 조건">
 <button id="trade-save-filter" type="button">현재 조건 저장</button><span class="note">이 브라우저에 최대 6개 저장합니다.</span>
+<button id="trade-presets-export" type="button" disabled>저장 조건 내보내기</button><button id="trade-presets-import" type="button">저장 조건 가져오기</button>
+<input id="trade-presets-file" type="file" accept=".json,application/json" hidden aria-label="가져올 저장 조건 JSON 파일">
 <div id="trade-presets" style="display:flex;flex-wrap:wrap;gap:8px;width:100%;min-width:0"></div>
 <p class="note" id="trade-preset-status" role="status" aria-live="polite" style="margin:0"></p>
 </section>
@@ -267,6 +269,7 @@ function persistPresets(message){
 }
 function renderPresets(){
  const root=$('#trade-presets');root.replaceChildren();
+ $('#trade-presets-export').disabled=presets.length===0;
  presets.forEach((p,i)=>{
   const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:4px;max-width:100%;min-width:0';
   const apply=document.createElement('button');apply.type='button';apply.textContent=presetLabel(p);apply.style.cssText='white-space:normal;text-align:left;min-width:0;overflow-wrap:anywhere';
@@ -281,6 +284,30 @@ $('#trade-save-filter').onclick=()=>{
  if(presets.some(p=>conditionHash(p)===conditionHash())){$('#trade-preset-status').textContent='이미 저장한 조건입니다.';return;}
  if(presets.length>=6){$('#trade-preset-status').textContent='최대 6개까지 저장할 수 있습니다. 기존 조건을 삭제한 뒤 저장하세요.';return;}
  presets.push(copyCondition(state));persistPresets('현재 조건을 이 브라우저에 저장했습니다.');
+};
+$('#trade-presets-export').onclick=()=>{
+ if(!presets.length)return;
+ const contents={kind:'house-trade-presets',schema:1,conditions:presets.map(copyCondition)};
+ downloadFile(new Blob([JSON.stringify(contents,null,2)+'\n'],{type:'application/json;charset=utf-8'}),'실거래_저장조건.json');
+ $('#trade-preset-status').textContent='저장 조건 JSON을 내려받았습니다. 다른 브라우저에서 저장 조건 가져오기로 복원하세요.';
+};
+$('#trade-presets-import').onclick=()=>$('#trade-presets-file').click();
+$('#trade-presets-file').onchange=async e=>{
+ const file=e.target.files[0];e.target.value='';if(!file)return;
+ const button=$('#trade-presets-import'),status=$('#trade-preset-status');button.disabled=true;
+ status.textContent='저장 조건 파일을 확인하고 있습니다.';
+ try{
+  if(file.size>32768)throw Error('저장 조건 파일은 32KB 이하여야 합니다.');
+  let contents;try{contents=JSON.parse(await file.text());}catch(e){throw Error('JSON 파일을 읽지 못했습니다. 저장 조건 내보내기로 만든 파일을 선택하세요.');}
+  if(!contents||contents.kind!=='house-trade-presets'||contents.schema!==1||!Array.isArray(contents.conditions)||contents.conditions.length>6||!contents.conditions.every(validPreset))throw Error('지원하지 않는 저장 조건 파일입니다. 파일 형식·지역·조건을 확인하세요.');
+  const merged=presets.map(copyCondition);
+  for(const p of contents.conditions)if(!merged.some(x=>conditionHash(x)===conditionHash(p)))merged.push(copyCondition(p));
+  if(merged.length>6)throw Error('기존 조건과 합치면 6개를 초과합니다. 기존 조건을 삭제한 뒤 다시 가져오세요.');
+  const added=merged.length-presets.length;
+  if(!added){status.textContent='추가할 새 조건이 없습니다. 기존 저장 조건을 유지합니다.';return;}
+  presets=merged;persistPresets(`${added}개 조건을 가져왔습니다. 기존 조건과 중복 없이 합쳤습니다.`);
+ }catch(e){status.textContent=e.message+' 기존 저장 조건은 유지합니다.';}
+ finally{button.disabled=false;}
 };
 const save=()=>{try{localStorage.setItem("kb-trades",JSON.stringify(state));}catch(e){}try{history.replaceState(null,'','#'+conditionHash());}catch(e){}const input=$('#trade-share-url');if(!input.hidden)input.value=location.href;};
 const lastOk=a=>{if(!a)return [null,-1];for(let i=a.length-1;i>=0;i--)if(ok(a[i]))return [a[i],i];return [null,-1];};
@@ -554,7 +581,10 @@ $('#trade-retry').onclick=()=>render();
 $('#trade-share').onclick=async()=>{save();const link=location.href;try{await navigator.clipboard.writeText(link);$('#trade-share-url').hidden=true;$('#trade-action-status').textContent='선택 조건 링크를 복사했습니다.';}catch(e){const input=$('#trade-share-url');input.value=link;input.hidden=false;input.focus();input.select();$('#trade-action-status').textContent='공유 주소를 직접 복사하세요.';}};
 function downloadCSV(rows,filename){
  const encode=v=>'"'+String(v==null||typeof v==='number'&&!Number.isFinite(v)?'':v).replace(/"/g,'""')+'"';
- const blob=new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ downloadFile(new Blob(['\uFEFF'+rows.map(r=>r.map(encode).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),filename);
+}
+function downloadFile(blob,filename){
+ const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 $('#trade-csv').onclick=()=>{
  if(activeProfile!==profileKey()||$('#trade-csv').disabled)return;
