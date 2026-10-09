@@ -160,6 +160,8 @@ jobs:
         with:
           path: |
             cache/molit
+            storage/trades
+            storage/extra
             cache/published
           key: molit-${{ github.run_id }}
           restore-keys: molit-
@@ -211,6 +213,8 @@ jobs:
         with:
           path: |
             cache/molit
+            storage/trades
+            storage/extra
             cache/published
           key: molit-${{ github.run_id }}
 
@@ -239,6 +243,10 @@ jobs:
         with:
           path: |
             cache/molit-rents
+            storage/rents
+            storage/supply
+            storage/pipeline
+            storage/moveins
             cache/supply
             cache/published/collection-status/supply.json
             cache/published/collection-status/rents.json
@@ -267,6 +275,10 @@ jobs:
         with:
           path: |
             cache/molit-rents
+            storage/rents
+            storage/supply
+            storage/pipeline
+            storage/moveins
             cache/supply
             cache/published/collection-status/supply.json
             cache/published/collection-status/rents.json

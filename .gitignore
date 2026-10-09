@@ -13,6 +13,9 @@ secrets/
 # API 응답 캐시
 cache/
 
+# Local historical data and SQLite archives (never publish or commit)
+storage/
+
 # Claude/Codex 독립 작업 폴더와 로컬 IDE 파일
 .worktrees/
 claude.code-workspace

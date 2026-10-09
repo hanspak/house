@@ -24,6 +24,7 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from trade_regions import REGIONS, districts, region_id
+from data_archive import save_rows, save_cached_rows
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE = os.path.join(ROOT, "cache", "molit")
@@ -130,10 +131,17 @@ def collect(months=24, workers=4, cached_only=False):
             stats["cache"] += 1
             cached_times.append(os.path.getmtime(path))
             with open(path, encoding="utf-8") as f:
-                return job, json.load(f)
+                rows = json.load(f)
+            save_cached_rows(ROOT, 'trades', kind, lawd, ym, rows, path)
+            return job, rows
         if cached_only:
             raise FileNotFoundError(path)
+        if os.path.exists(path):
+            with open(path, encoding='utf-8') as f:
+                previous = json.load(f)
+            save_cached_rows(ROOT, 'trades', kind, lawd, ym, previous, path)
         rows = fetch(key, kind, lawd, ym)
+        save_rows(ROOT, 'trades', kind, lawd, ym, rows)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path + '.part', "w", encoding="utf-8") as f:
             json.dump(rows, f, ensure_ascii=False)

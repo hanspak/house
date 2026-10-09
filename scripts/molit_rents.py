@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from molit_trades import api_key, months_back, pace
 from data_revisions import save_published
 from trade_regions import REGIONS, districts, region_id
+from data_archive import save_rows, save_cached_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -100,8 +101,13 @@ def collect(months=6, workers=8):
         path = ROOT / 'cache/molit-rents' / f'{code}_{month}.json'
         try:
             if month not in yms[-3:] and path.exists():
-                return job, json.loads(path.read_text())
+                rows = json.loads(path.read_text())
+                save_cached_rows(ROOT, 'rents', 'apt', code, month, rows, path)
+                return job, rows
+            if path.exists():
+                save_cached_rows(ROOT, 'rents', 'apt', code, month, json.loads(path.read_text()), path)
             rows = fetch(key, code, month)
+            save_rows(ROOT, 'rents', 'apt', code, month, rows)
             path.parent.mkdir(parents=True, exist_ok=True)
             part = path.with_suffix('.part')
             part.write_text(json.dumps(rows, ensure_ascii=False))

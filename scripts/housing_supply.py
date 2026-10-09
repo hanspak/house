@@ -8,6 +8,7 @@ import urllib.request
 import openpyxl
 
 from data_revisions import save_published
+from data_archive import save_file
 from trade_regions import PROVINCES, districts
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,10 +90,13 @@ def collect(limit=6):
         with urllib.request.urlopen(url, timeout=30) as response:
             body = response.read()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            save_file(ROOT, 'supply', 'unsold', month, path, origin='cache_import')
         part = path.with_suffix('.part')
         part.write_bytes(body)
         part.replace(path)
         periods[month] = parse_workbook(path, month)
+        save_file(ROOT, 'supply', 'unsold', month, path)
         print('공식 미분양 추출:', month, flush=True)
     months = sorted(periods)
     keys = sorted({k for period in periods.values() for k in period['total']})

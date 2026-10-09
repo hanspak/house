@@ -11,6 +11,7 @@ import math
 import re
 from pathlib import Path
 from collection_runs import write
+from data_archive import record, save_file
 import json
 import os
 import sys
@@ -205,7 +206,17 @@ def main(source=None):
             if not valid_feed(data):
                 raise ValueError('invalid_series')
             data['collected'] = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M KST')
-            write(Path(ROOT) / 'cache/published/extra' / (key + '.json'), data)
+            dest = Path(ROOT) / 'cache/published/extra' / (key + '.json')
+            if dest.exists():
+                try:
+                    previous = json.loads(dest.read_text())
+                    previous_period = previous['months'][-1] if valid_feed(previous) else 'previous-period-unknown'
+                except (ValueError, TypeError, KeyError):
+                    previous_period = 'previous-period-unknown'
+                save_file(ROOT, 'extra', key, previous_period, dest, origin='cache_import')
+            record(ROOT, 'extra', key, '', data['months'][-1],
+                   json.dumps(data, ensure_ascii=False, allow_nan=False).encode('utf-8'), 'json', origin='api')
+            write(dest, data)
             print(f'{key}: {data["months"][0]} ~ {data["months"][-1]}', flush=True)
         except Exception as error:
             failures += 1

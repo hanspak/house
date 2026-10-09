@@ -9,6 +9,7 @@ import urllib.parse
 import urllib.request
 
 from data_revisions import save_published
+from data_archive import save_file
 from trade_regions import PROVINCES, districts
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,7 +114,10 @@ def collect():
     data['collected'] = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M KST')
     raw = ROOT / 'cache/moveins/latest.csv'
     raw.parent.mkdir(parents=True, exist_ok=True)
+    if raw.exists():
+        save_file(ROOT, 'moveins', 'scheduled', 'previous-asof-unknown', raw, origin='cache_import')
     raw.write_bytes(body)
+    save_file(ROOT, 'moveins', 'scheduled', asof, raw)
     save_published('moveins', data, ROOT / 'cache/published/housing/moveins.json.gz', ROOT / 'data/moveins.json.gz')
     print(f'입주예정 집계: 기준 {asof}, {data["row_count"]}행, {data["total_units"]:,}호', flush=True)
     return data

@@ -200,3 +200,9 @@ GitHub API가 HTTP 429 또는 Remaining=0인 403을 반환하면 추가 API 조�
 - `market_extra.py --source apt_trades|unsold|rates`는 개별 자료를 `cache/published/extra/<자료>.json`에 저장한다. load_extra()가 정상 캐시·게시 집계·기본 자료 중 자료별 최신 수집일을 선택하고 원래 수집일을 유지한다. 형식 오류·빈 응답으로 정상 자료를 교체하지 않는다.
 - 실거래 snapshot 생성도 최신 보조자료를 병합한다. 새 매매 집계가 없어도 다음 배포에서 새 금리/거래량/미분양을 표시하며 회복률·출처 날짜를 재계산한다. 매매 집계의 수집일은 바꾸지 않는다.
 - 종합 화면의 수집 실행 상태는 화면 생성 시점 기준이다. 이력 도입 전 실행은 추정하지 않는다. Actions 캐시로 보존하며 캐시 소실 시 실행 이력의 영구 복원은 보장하지 않는다. housing은 자기 자료 4개의 상태 파일만 복원해 다른 작업의 상태를 덮어쓰지 않는다.
+
+## 원자료 보관·SQLite
+
+`data_archive.py`가 자료별 `storage/<자료>/archive.sqlite3`와 내용 해시 압축 파일을 관리한다. 기존 캐시 교체 전 버전, 신규 추출 거래/공식 다운로드 파일을 누적 보존한다. 동일 행 여러 건과 개편 전후 코드별 응답을 유지하며 대시보드의 기존 집계 산식은 유지한다. 저장 파일은 Git/Pages에서 제외한다.
+
+`import-cache`, `status`, `verify`, `backup` 명령과 원자료 범위·시각·중복·복원 정책은 `docs/data-storage.md`를 따른다. Actions는 자료별 storage를 캐시로 보존하지만 영구 외부 백업은 별도로 연결해야 한다.

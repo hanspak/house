@@ -6,6 +6,7 @@ import urllib.parse
 import urllib.request
 
 from data_revisions import save_published
+from data_archive import save_file
 from trade_regions import PROVINCES
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,7 +90,11 @@ def collect(limit=6):
                 body = response.read()
             periods[month] = parse_workbook(body, month, label)
             raw = ROOT / 'cache/pipeline' / (kind + '_' + month + '.xls')
-            raw.parent.mkdir(parents=True, exist_ok=True);raw.write_bytes(body)
+            raw.parent.mkdir(parents=True, exist_ok=True)
+            if raw.exists():
+                save_file(ROOT, 'pipeline', kind, month, raw, origin='cache_import')
+            raw.write_bytes(body)
+            save_file(ROOT, 'pipeline', kind, month, raw)
             print('아파트 공급 실적:', label, month, periods[month]['전국'], flush=True)
         stages[kind] = periods
     months = sorted(set.intersection(*(set(v) for v in stages.values())))
