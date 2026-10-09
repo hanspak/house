@@ -536,13 +536,39 @@ def(12,"아파트 거래 회복률","평소 같은 계절보다 거래가 얼마
 // ---------- shell ----------
 let compositionOpen=false,compositionTicket=0;
 const compositionKeys=['small-all','medium-all','large-all','all-new','all-middle','all-old'];
+const compositionAxes=()=>[['면적',['small','medium','large'],D.filters.area],['연식',['new','middle','old'],D.filters.age]];
+const compositionProfile=(axis,key)=>axis==='면적'?key+'-all':'all-'+key;
 function compositionRows(stats,g,k){
  const base=D.agg[k][g],n=TradeComposition.total(base.n,last3),old=TradeComposition.total(base.n,prev3);
- return [['면적',['small','medium','large'],D.filters.area],['연식',['new','middle','old'],D.filters.age]].flatMap(([axis,keys,labels])=>{
-  const profiles=keys.map(key=>axis==='면적'?key+'-all':'all-'+key);
+ return compositionAxes().flatMap(([axis,keys,labels])=>{
+  const profiles=keys.map(key=>compositionProfile(axis,key));
   const current=profiles.map(key=>TradeComposition.total(stats[key]?.[k]?.[g]?.n,last3)),previous=profiles.map(key=>TradeComposition.total(stats[key]?.[k]?.[g]?.n,prev3));
   return TradeComposition.compare(n,old,current,previous).map((row,i)=>({...row,axis,label:i===3?'미확인':labels[keys[i]]}));
  });
+}
+function compositionMonths(stats,g,k){
+ return compositionAxes().map(([axis,keys,labels])=>({axis,labels:[...keys.map(key=>labels[key]),'미확인'],
+  months:TradeComposition.monthly(D.agg[k][g].n,keys.map(key=>stats[compositionProfile(axis,key)]?.[k]?.[g]?.n))}));
+}
+function renderCompositionMonths(box,axes,g,k,current){
+ const share=v=>ok(v)?v.toFixed(1)+'%':'–';
+ box.innerHTML='<h3>월별 거래 구성 추이</h3><p class="note">'+regionLabel(g)+' · '+TN[k]+' · '+MS[0]+'~'+MS[MS.length-1]+' · 전체 면적·연식 · 월별 전체 거래가 분모입니다. 0건·누락은 비중을 비우고 선을 연결하지 않습니다. 10건 미만인 월은 비중 변동에 주의하세요. 음영은 신고 집계 중인 달이며 추후 달라질 수 있습니다.</p><button type="button" id="composition-monthly-csv">월별 거래 구성 CSV</button><div class="grid" id="composition-monthly-charts"></div><details><summary>월별 건수·비중 표 보기</summary><div class="tbl"><table id="composition-monthly-table"><thead><tr><th>계약월</th><th>분류</th><th>구간</th><th>전체 건수</th><th>구간 건수</th><th>비중</th><th>자료 상태</th><th>신고 상태</th></tr></thead><tbody></tbody></table></div></details>';
+ const charts=box.querySelector('#composition-monthly-charts');
+ axes.forEach(a=>{
+  const chart=document.createElement('div');charts.appendChild(chart);
+  const heading=document.createElement('h4');heading.textContent=a.axis+'별 거래 비중';chart.appendChild(heading);
+  const series=a.labels.map((label,j)=>({n:label,c:j===3?css('--ink-3'):SER[j],v:a.months.map(m=>m.groups[j].share)}));
+  const h=240,w=Math.min(560,Math.max(280,chart.clientWidth)),m={l:42,r:16,t:10,b:24};
+  const xlab=(svg,X,h)=>{let last=-Infinity;MS.forEach((month,i)=>{if((i===0||month.endsWith('-01')||month.endsWith('-07'))&&X(i)-last>=48){txt(svg,X(i),h-6,month.slice(2).replace('-','.'),{'text-anchor':'middle',class:'muted'});last=X(i);}});};
+  const r=lineChart(chart,{n:MS.length,series,w,h,m,lo:0,hi:100,yfmt:v=>v+'%',xlab,hover:i=>`<b>${MS[i]}${partial(MS[i])?' (집계 중)':''}</b><br>전체 ${count(a.months[i].total)}건<br>`+series.map((s,j)=>`${s.n}: ${count(a.months[i].groups[j].n)}건 · ${share(s.v[i])}`).join('<br>')+(a.months[i].status?'<br>'+a.months[i].status:'')});
+  r.svg.setAttribute('aria-label',regionLabel(g)+' '+TN[k]+' '+a.axis+'별 월별 거래 비중, 상세 수치는 아래 표 참조');
+  series.forEach(s=>s.v.forEach((v,i)=>{if(ok(v))el('circle',{cx:r.X(i),cy:r.Y(v),r:2,fill:s.c,'pointer-events':'none'},r.svg);}));
+  const pi=MS.findIndex(partial);if(pi>=0&&r.lo!==undefined)el('rect',{x:r.X(pi)-4,y:m.t,width:r.X(MS.length-1)-r.X(pi)+8,height:h-m.t-m.b,fill:css('--ink-3'),opacity:.1,'pointer-events':'none'},r.svg);
+  const legend=document.createElement('div');legend.className='legend';legend.innerHTML=series.map(s=>`<span><i style="background:${s.c}"></i>${s.n}</span>`).join('');chart.appendChild(legend);
+ });
+ const rows=MS.flatMap((month,i)=>axes.flatMap(a=>a.months[i].groups.map((r,j)=>({month,axis:a.axis,label:a.labels[j],total:a.months[i].total,...r,status:a.months[i].status||'비중 확인 가능',report:partial(month)?'집계 중':'일반 집계'}))));
+ box.querySelector('tbody').innerHTML=rows.map(r=>`<tr><td>${r.month}</td><td>${r.axis}</td><td>${r.label}</td><td>${count(r.total)}</td><td>${count(r.n)}</td><td>${share(r.share)}</td><td>${r.status}</td><td>${r.report}</td></tr>`).join('');
+ box.querySelector('#composition-monthly-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','계약월','분류','구간','전체 거래 건수','구간 거래 건수','비중(%)','자료 상태','신고 상태','연식 기준연도','조건','수집일'],...rows.map(r=>[regionLabel(g),TN[k],r.month,r.axis,r.label,r.total,r.n,r.share,r.status,r.report,D.filters.year,'전체 면적·연식',D.collected])],'실거래_월별거래구성.csv');};
 }
 function compositionRegions(stats,regions,k){
  return regions.flatMap(g=>{
@@ -556,11 +582,11 @@ function compositionRegions(stats,regions,k){
 def(13,'거래 구성 변화','가격 변화와 함께 거래된 주택의 면적·연식 비중을 확인',true,box=>{
  const g=state.gu,k=state.type,ticket=++compositionTicket;
  const note=`${regionLabel(g)} · ${TN[k]} · 전체 면적·연식 거래 구성 · 화면의 면적·연식 필터와 별도 · 연식은 ${D.filters.year}년 기준`;
- box.innerHTML=`<p class="sub">${note}</p><button type="button" id="composition-load">선택 지역 거래 구성 보기</button><p class="note" id="composition-status" role="status" aria-live="polite"></p><div id="composition-content"></div><div id="composition-regions-content"></div><p class="note">최근 신고 집계 중인 달을 제외한 3개월과 전년 같은 3개월을 비교합니다. 비중의 분모는 해당 유형 전체 거래이며 면적·연식 미확인을 포함합니다. 두 분류는 각각 별도 합계입니다. 거래 구성의 변화는 가격 상승·하락의 원인을 확정하지 않으며, 같은 면적·연식에서도 단지·입지·층 차이는 남습니다.</p>`;
- const button=box.querySelector('#composition-load'),status=box.querySelector('#composition-status'),content=box.querySelector('#composition-content'),regional=box.querySelector('#composition-regions-content');
+ box.innerHTML=`<p class="sub">${note}</p><button type="button" id="composition-load">선택 지역 거래 구성 보기</button><p class="note" id="composition-status" role="status" aria-live="polite"></p><div id="composition-content"></div><div id="composition-monthly-content"></div><div id="composition-regions-content"></div><p class="note">최근 신고 집계 중인 달을 제외한 3개월과 전년 같은 3개월을 비교합니다. 비중의 분모는 해당 유형 전체 거래이며 면적·연식 미확인을 포함합니다. 두 분류는 각각 별도 합계입니다. 거래 구성의 변화는 가격 상승·하락의 원인을 확정하지 않으며, 같은 면적·연식에서도 단지·입지·층 차이는 남습니다.</p>`;
+ const button=box.querySelector('#composition-load'),status=box.querySelector('#composition-status'),content=box.querySelector('#composition-content'),regional=box.querySelector('#composition-regions-content'),monthly=box.querySelector('#composition-monthly-content');
  const current=()=>ticket===compositionTicket&&box.isConnected&&g===state.gu&&k===state.type;
  const load=async()=>{
-  compositionOpen=true;button.disabled=true;status.textContent='거래 구성 자료를 읽고 있습니다.';content.replaceChildren();regional.replaceChildren();
+  compositionOpen=true;button.disabled=true;status.textContent='거래 구성 자료를 읽고 있습니다.';content.replaceChildren();regional.replaceChildren();monthly.replaceChildren();
   try{
    const values=await Promise.all(compositionKeys.map(key=>profileLoader.load(key)));if(!current())return;
    const stats=Object.fromEntries(compositionKeys.map((key,i)=>[key,values[i]])),rows=compositionRows(stats,g,k);
@@ -570,6 +596,7 @@ def(13,'거래 구성 변화','가격 변화와 함께 거래된 주택의 면�
    const share=v=>ok(v)?v.toFixed(1)+'%':'–',delta=v=>ok(v)?(v>0?'+':'')+v.toFixed(1)+'%p':'–';
    content.innerHTML='<button type="button" id="composition-csv">거래 구성 CSV</button><div class="tbl"><table><thead><tr><th>분류</th><th>구간</th><th>전년 건수</th><th>전년 비중</th><th>최근 건수</th><th>최근 비중</th><th>비중 변화</th><th>상태</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${r.axis}</td><td>${r.label}</td><td>${count(r.previous)}</td><td>${share(r.previousShare)}</td><td>${count(r.n)}</td><td>${share(r.share)}</td><td>${delta(r.delta)}</td><td>${r.status||'비교 가능'}</td></tr>`).join('')+'</tbody></table></div>';
    content.querySelector('#composition-csv').onclick=()=>{if(!current())return;downloadCSV([['지역','유형','분류','구간','최근 기간','전년 기간','연식 기준연도','최근 건수','최근 비중(%)','전년 건수','전년 비중(%)','비중 변화(%p)','상태','조건','수집일'],...rows.map(r=>[regionLabel(g),TN[k],r.axis,r.label,p3label,previous,D.filters.year,r.n,r.share,r.previous,r.previousShare,r.delta,r.status||'비교 가능','전체 면적·연식',D.collected])],'실거래_거래구성.csv');};
+   renderCompositionMonths(monthly,compositionMonths(stats,g,k),g,k,current);
    const comparisons=compositionRegions(stats,compareRegions(),k);
    regional.innerHTML='<h3>지역별 거래 구성 비교</h3><p class="note">'+(g==='전국'?'17개 시도':g.split('|')[0]+' 시군구')+' · 면적·연식별 비중 변화가 가장 큰 구간을 변화 폭 순으로 표시합니다. 양쪽 기간 전체 거래가 각각 10건 이상인 지역만 비교하며, 이는 표시 기준이고 통계적 신뢰도를 뜻하지 않습니다. 미확인 구간도 포함하므로 자료 기재 차이의 영향을 확인하세요. 변화 폭이 같으면 기존 구간 순서의 첫 구간을 표시합니다. 지역 이름을 누르면 상세 구성을 확인할 수 있습니다.</p><button type="button" id="composition-regions-csv">지역 거래 구성 CSV</button><div class="tbl"><table id="composition-regions"><thead><tr><th>지역</th><th>분류</th><th>최대 변화 구간</th><th>전년 전체 건수</th><th>최근 전체 건수</th><th>구간 전년 비중</th><th>구간 최근 비중</th><th>비중 변화</th><th>상태</th></tr></thead><tbody>'+comparisons.map((r,i)=>`<tr><td><button type="button" data-region-row="${i}">${regionLabel(r.g)}</button></td><td>${r.axis}</td><td>${r.label}</td><td>${count(r.previous)}</td><td>${count(r.n)}</td><td>${share(r.previousShare)}</td><td>${share(r.share)}</td><td>${delta(r.delta)}</td><td>${r.status}</td></tr>`).join('')+'</tbody></table></div>';
    regional.querySelectorAll('[data-region-row]').forEach(b=>b.onclick=()=>{if(current())goGu(comparisons[Number(b.dataset.regionRow)].g)();});

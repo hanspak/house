@@ -41,3 +41,27 @@ test('missing, invalid sums or nonfinite changes hold the regional comparison',(
 test('unchanged shares do not invent a dominant group',()=>{
  assert.deepEqual(C.largestChange(C.compare(100,200,[30,20,10],[60,40,20]),100,200),{group:null,delta:0,status:'모든 구간 비중 동일'});
 });
+test('monthly composition retains calendar positions and unknown denominator',()=>{
+ const rows=C.monthly([100,200],[[30,60],[20,20],[10,40]]);
+ assert.deepEqual(rows.map(r=>r.groups[3].n),[40,80]);
+ assert.equal(rows[1].groups[1].share,10);
+ assert(rows.every(r=>r.groups.reduce((n,g)=>n+g.share,0)===100));
+});
+test('monthly zero and missing observations leave gaps without inventing counts',()=>{
+ const rows=C.monthly([0,null,10],[[0,null,2],[0,null,3],[0,null,1]]);
+ assert(rows[0].groups.every(g=>g.n===0&&g.share===null));
+ assert(rows[1].groups.every(g=>g.n===null&&g.share===null));
+ assert.equal(rows[2].groups[3].share,40);assert.equal(rows.length,3);
+ assert.match(rows[0].status,/0건/);assert.match(rows[1].status,/누락/);
+});
+test('small monthly totals retain shares and explicitly flag volatility',()=>{
+ const rows=C.monthly([9,10],[[1,1],[3,3],[3,3]]);
+ assert.equal(rows[0].groups[0].share,100/9);assert.match(rows[0].status,/10건 미만/);
+ assert.equal(rows[1].status,'');
+});
+test('monthly missing groups, short arrays and inconsistent sums are held',()=>{
+ for(const groups of [[[1],[2]],[[1,2],[2],[3,4]],[[10,10],[10,10],[10,10]],undefined]){
+  const rows=C.monthly([20,20],groups);assert(rows.some(r=>r.groups.every(g=>g.share===null)));
+ }
+ assert(C.partition(10,[1,2]).every(r=>r.share===null));
+});

@@ -7,7 +7,7 @@
   return selected.every(count)?selected.reduce((a,b)=>a+b,0):null;
  }
  function partition(n,groups){
-  const valid=count(n)&&groups.every(count)&&groups.reduce((a,b)=>a+b,0)<=n;
+  const valid=count(n)&&groups.length===3&&groups.every(count)&&groups.reduce((a,b)=>a+b,0)<=n;
   const counts=[...groups,valid?n-groups.reduce((a,b)=>a+b,0):null];
   return counts.map(v=>({n:v,share:valid&&n>0?v/n*100:null,status:!valid?'자료 누락 또는 구간 합계 불일치':n===0?'거래 0건으로 비중 보류':''}));
  }
@@ -25,5 +25,11 @@
   const group=rows.reduce((best,r,i)=>Math.abs(r.delta)>Math.abs(rows[best].delta)?i:best,0);
   return rows[group].delta===0?{group:null,delta:0,status:'모든 구간 비중 동일'}:{group,delta:rows[group].delta,status:'비교 가능'};
  }
- return Object.freeze({total,partition,compare,largestChange});
+ function monthly(totals,series){
+  return totals.map((n,i)=>{
+   const groups=partition(n,Array.from({length:3},(_,j)=>series?.[j]?.[i]??null));
+   return {total:n,groups,status:groups[0].status||(n<10?'전체 거래 10건 미만: 비중 변동 주의':'')};
+  });
+ }
+ return Object.freeze({total,partition,compare,largestChange,monthly});
 });
