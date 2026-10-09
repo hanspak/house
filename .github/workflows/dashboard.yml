@@ -4,12 +4,18 @@
 #   trades.html  = 실거래·거래량·금리 (국토부 실거래가, 부동산원 R-ONE, 한국은행 ECOS)
 # 필요한 저장소 Secrets: KB_SA_KEY_JSON (서비스 계정 키 JSON 전체), KB_DRIVE_FOLDER_ID,
 #                        DATA_GO_KR_KEY, RONE_KEY, ECOS_KEY (별도 데이터 갱신 작업에서 사용)
+# 예약·수동 실행은 게시 → 수집(refresh·housing) → 수집 성공 시 게시 전용 실행(publish_only)을 다시 띄워 바로 반영한다.
 name: 국면판 갱신
 
 on:
   schedule:
     - cron: "0 0 * * *"   # 매일 09:00 KST (UTC 00:00)
   workflow_dispatch:       # Actions 탭의 "Run workflow" 버튼으로 즉시 실행
+    inputs:
+      publish_only:
+        description: "수집 없이 저장된 자료로 화면만 다시 게시"
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -24,13 +30,13 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
+# 게시(build·deploy)만 새 실행이 이전 실행을 취소한다. 자료 수집(refresh·housing)은 push로 취소되지 않도록 job별로 따로 묶는다.
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     outputs:
       stale: ${{ steps.fresh.outputs.stale }}
       message: ${{ steps.fresh.outputs.message }}
@@ -125,6 +131,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -144,10 +153,14 @@ jobs:
 
   refresh:
     # 수집 실패·시간 초과가 화면 게시를 막지 않도록 배포 완료 후 갱신한다.
+    # 게시가 취소·실패해도 수집은 진행한다(always).
     needs: deploy
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.publish_only))
     runs-on: ubuntu-latest
     timeout-minutes: 65
+    concurrency:
+      group: refresh
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -229,9 +242,12 @@ jobs:
   housing:
     # 공급·임대차 수집은 기존 실거래 수집과 독립 실행하여 게시를 지연시키지 않는다.
     needs: deploy
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.publish_only))
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    concurrency:
+      group: housing
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -297,3 +313,16 @@ jobs:
             cache/published/collection-status/pipeline.json
             cache/published/collection-status/moveins.json
           key: housing-published-${{ github.run_id }}
+
+  republish:
+    # 수집한 자료가 다음 실행까지 기다리지 않고 바로 화면에 반영되도록, 수집 없이 게시만 하는 실행을 띄운다.
+    needs: [refresh, housing]
+    if: always() && (needs.refresh.result == 'success' || needs.housing.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: 게시 전용 실행 시작
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run dashboard.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f publish_only=true
