@@ -132,7 +132,7 @@ def source_dates(data):
         if series:
             available = [i for i in range(len(series['months'])) if any(i < len(v) and v[i] is not None for v in series['values'].values())]
             result.append({'name': label, 'period': series['months'][max(available)] if available else None,
-                           'collected': data['extra'].get('collected'), 'basis': basis})
+                           'collected': series.get('collected', data['extra'].get('collected')), 'basis': basis})
     if data.get('kb'):
         result.append({'name': 'KB 월간', 'period': data['kb']['asof'], 'collected': None, 'basis': '조사 시세 · 수집일 기록 없음'})
     return result

@@ -47,11 +47,16 @@ nav,.controls,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}na
 <p class="note">자료별 최근 변경 수집 12회·변경 값 최대 20,000개를 보존합니다. 그 이전 이력은 제공하지 않습니다. 전국·시도·시군구 합계가 함께 바뀔 수 있으므로 변경 값 건수는 개별 계약 건수가 아닙니다.</p>
 </section>
 <section class="source" id="source-status"><h2>자료 기준일·갱신 점검</h2><p id="health-policy" class="note"></p><button id="source-csv" type="button">자료 상태 CSV</button><p class="note">수집일과 자료 기준기간은 다릅니다. 전체 자료의 최신 기간이며, 개별 지역은 카드에 표시된 기간을 확인하세요.</p><div class="table-wrap"><table id="sources"></table></div></section>
+<section class="source" id="collection-status"><h2>수집 실행 상태</h2><p class="note">마지막 시도와 마지막 성공은 별도 기록입니다. 현재 게시 자료의 수집일은 위 표에서 확인하세요. 상태는 화면 생성 시점 기준이며 다음 배포에 반영됩니다. 실행 기록은 자료별 최근 30회를 보존합니다.</p><div class="table-wrap"><table id="collections"></table></div></section>
 </main><script>
 /*COMPARISON*/
 const D=/*DATA*/;
 const $=s=>document.querySelector(s),valid=v=>typeof v==='number'&&Number.isFinite(v),label=r=>r.replace('|',' ');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const collectionNames={trades:'국토부 매매',apt_trades:'R-ONE 거래량',unsold:'R-ONE 미분양',rates:'ECOS 금리',rents:'아파트 전월세',supply:'공식 미분양',pipeline:'공급 실적',moveins:'입주예정'};
+const collectionLabels={success:'성공',failure:'실패',partial:'일부 수집 실패',timeout:'시간 초과',interrupted:'중단',running:'종료 미확인'};
+function renderCollections(){$('#collections').innerHTML='<thead><tr><th>자료</th><th>마지막 시도</th><th>결과</th><th>종료 시각</th><th>마지막 성공</th></tr></thead><tbody>'+(D.collection_status||[]).map(s=>'<tr><td>'+esc(collectionNames[s.name]||s.name)+'</td><td>'+esc(s.last_attempt?.started||'기록 없음')+'</td><td>'+esc(collectionLabels[s.last_attempt?.status]||'기록 없음')+'</td><td>'+esc(s.last_attempt?.finished||'–')+'</td><td>'+esc(s.last_success||'기록 없음')+'</td></tr>').join('')+'</tbody>';}
+renderCollections();
 const definitions=[['price','매매지수 최근 4주'],['jeonse','전세지수 최근 4주'],['recovery','아파트 거래 회복률'],['trade_price','최근 3개월 실거래 중위'],['completed','준공 후 미분양'],['supply_share','미분양 중 준공 후 비중'],['rent_deposit','전세 보증금 중위'],['monthly_rent','월세 중위액'],['jeonse_ratio','KB 전세가율'],['hai','주택구매력지수 HAI'],['rate','주택담보대출 금리'],['permit','아파트 인허가(월)'],['start','아파트 착공(월)'],['completion','아파트 준공(월)'],['moveins6','향후 6개월 예정(월 기재)'],['moveins12','향후 12개월 예정(월 기재)'],['moveins_unknown','입주예정 월 미정']];
 let state={region:'전국',watch:['서울','경기','부산']};
 try{const saved=JSON.parse(localStorage.getItem('house-overview')||'{}');if(D.regions.includes(saved.region))state.region=saved.region;if(Array.isArray(saved.watch))state.watch=saved.watch;state.compareColumns=saved.compareColumns;state.compareBase=saved.compareBase;state.compareDelta=saved.compareDelta;}catch{}

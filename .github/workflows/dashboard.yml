@@ -86,7 +86,12 @@ jobs:
       - name: 마지막 공급·전월세 집계 복원
         uses: actions/cache/restore@v4
         with:
-          path: cache/published/housing
+          path: |
+            cache/published/housing
+            cache/published/collection-status/supply.json
+            cache/published/collection-status/rents.json
+            cache/published/collection-status/pipeline.json
+            cache/published/collection-status/moveins.json
           key: housing-published-${{ github.run_id }}
           restore-keys: housing-published-
 
@@ -142,7 +147,7 @@ jobs:
     needs: deploy
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -165,14 +170,25 @@ jobs:
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           MOLIT_API_ATTEMPTS: "2"
-        run: timeout --signal=TERM 35m python -u scripts/molit_trades.py --workers 12
+        run: python -u scripts/collection_runs.py --name trades --timeout 2100 --result cache/trades.json -- python -u scripts/molit_trades.py --workers 12
 
-      - name: 거래량·미분양·금리 갱신 (최대 5분)
-        if: steps.collect.outcome == 'success'
+      - name: R-ONE trade volume
+        continue-on-error: true
         env:
           RONE_KEY: ${{ secrets.RONE_KEY }}
+        run: python -u scripts/collection_runs.py --name apt_trades --timeout 300 -- python -u scripts/market_extra.py --source apt_trades
+
+      - name: R-ONE unsold homes
+        continue-on-error: true
+        env:
+          RONE_KEY: ${{ secrets.RONE_KEY }}
+        run: python -u scripts/collection_runs.py --name unsold --timeout 300 -- python -u scripts/market_extra.py --source unsold
+
+      - name: ECOS rates
+        continue-on-error: true
+        env:
           ECOS_KEY: ${{ secrets.ECOS_KEY }}
-        run: timeout --signal=TERM 5m python -u scripts/market_extra.py
+        run: python -u scripts/collection_runs.py --name rates --timeout 300 -- python -u scripts/market_extra.py --source rates
 
       - name: 완전한 전국 자료를 게시용 집계로 저장
         if: steps.collect.outcome == 'success'
@@ -224,23 +240,27 @@ jobs:
           path: |
             cache/molit-rents
             cache/supply
+            cache/published/collection-status/supply.json
+            cache/published/collection-status/rents.json
+            cache/published/collection-status/pipeline.json
+            cache/published/collection-status/moveins.json
             cache/published/housing
           key: housing-${{ github.run_id }}
           restore-keys: housing-
       - name: 공식 미분양 갱신 (최대 5분)
         continue-on-error: true
-        run: timeout --signal=TERM 5m python -u scripts/housing_supply.py
+        run: python -u scripts/collection_runs.py --name supply --timeout 300 -- python -u scripts/housing_supply.py
       - name: 아파트 공급 단계 갱신 (최대 5분)
         continue-on-error: true
-        run: timeout --signal=TERM 5m python -u scripts/housing_pipeline.py
+        run: python -u scripts/collection_runs.py --name pipeline --timeout 300 -- python -u scripts/housing_pipeline.py
       - name: 공동주택 입주예정 갱신 (최대 2분)
         continue-on-error: true
-        run: timeout --signal=TERM 2m python -u scripts/housing_moveins.py
+        run: python -u scripts/collection_runs.py --name moveins --timeout 120 -- python -u scripts/housing_moveins.py
       - name: 전국 전월세 갱신 (최대 20분)
         continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
-        run: timeout --signal=TERM 20m python -u scripts/molit_rents.py --months 6 --workers 8
+        run: python -u scripts/collection_runs.py --name rents --timeout 1200 --result cache/rents.json -- python -u scripts/molit_rents.py --months 6 --workers 8
       - name: 받은 공급·임대차 캐시 보존
         if: always()
         uses: actions/cache/save@v4
@@ -248,11 +268,20 @@ jobs:
           path: |
             cache/molit-rents
             cache/supply
+            cache/published/collection-status/supply.json
+            cache/published/collection-status/rents.json
+            cache/published/collection-status/pipeline.json
+            cache/published/collection-status/moveins.json
             cache/published/housing
           key: housing-${{ github.run_id }}
       - name: 다음 배포용 공급·임대차 집계 보존
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: cache/published/housing
+          path: |
+            cache/published/housing
+            cache/published/collection-status/supply.json
+            cache/published/collection-status/rents.json
+            cache/published/collection-status/pipeline.json
+            cache/published/collection-status/moveins.json
           key: housing-published-${{ github.run_id }}

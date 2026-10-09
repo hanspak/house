@@ -5,6 +5,12 @@
 키: 환경변수 RONE_KEY, ECOS_KEY 또는 secrets/api_keys.json 의 rone, ecos
 """
 import datetime as dt
+import argparse
+import gzip
+import math
+import re
+from pathlib import Path
+from collection_runs import write
 import json
 import os
 import sys
@@ -139,28 +145,76 @@ def ecos_rates(key, start="201001"):
             "source": "한국은행 ECOS 722Y001(기준금리), 121Y006(예금은행 대출금리, 신규취급액 기준)"}
 
 
-def main():
+def valid_feed(data):
+    if not isinstance(data, dict):
+        return False
+    months, values = data.get('months'), data.get('values')
+    return (isinstance(months, list) and bool(months) and
+            all(isinstance(m, str) and re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', m) for m in months) and
+            months == sorted(set(months)) and isinstance(values, dict) and bool(values) and
+            all(isinstance(a, list) and len(a) == len(months) and
+                all(v is None or isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in a)
+                for a in values.values()) and
+            any(v is not None for a in values.values() for v in a))
+
+
+def load_extra(root=ROOT):
+    root = Path(root)
+    out, candidates = {}, []
+    for path in (root / 'data/trades.json.gz', root / 'cache/published/trades.json.gz'):
+        if path.exists():
+            try:
+                with gzip.open(path, 'rt', encoding='utf-8') as f:
+                    candidates.append(json.load(f).get('extra', {}))
+            except (OSError, ValueError, AttributeError):
+                print('Unreadable extra baseline skipped', flush=True)
+    path = root / 'cache/extra.json'
+    if path.exists():
+        try:
+            candidates.append(json.loads(path.read_text(encoding='utf-8')))
+        except (OSError, ValueError):
+            print('Unreadable extra cache skipped', flush=True)
+    for key in ('apt_trades', 'unsold', 'rates'):
+        feeds = [{**c[key], 'collected': c[key].get('collected', c.get('collected'))}
+                 for c in candidates if isinstance(c, dict) and valid_feed(c.get(key))]
+        path = root / 'cache/published/extra' / (key + '.json')
+        if path.exists():
+            try:
+                feed = json.loads(path.read_text(encoding='utf-8'))
+                if valid_feed(feed):
+                    feeds.append(feed)
+            except (OSError, ValueError):
+                print('Unreadable extra feed skipped', flush=True)
+        if feeds:
+            # Prefer the dedicated feed on equal timestamps (legacy stamps have minute precision).
+            out[key] = max(reversed(feeds), key=lambda f: f.get('collected') or '')
+    out['collected'] = max((f.get('collected') or '' for f in out.values()), default='')
+    return out
+
+
+def main(source=None):
     rone, ecos = keys()
-    out = {"collected": dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d %H:%M KST")}
-    if rone:
-        out["apt_trades"] = rone_apt_trades(rone)
-        print(f"R-ONE 아파트 매매 거래량: {len(out['apt_trades']['values'])}개 지역, "
-              f"{out['apt_trades']['months'][0]} ~ {out['apt_trades']['months'][-1]}")
-        out["unsold"] = rone_unsold(rone)
-        u = out["unsold"]
-        last = max(i for i, v in enumerate(u["values"]["전국"]) if v is not None)
-        print(f"R-ONE 미분양: {u['months'][0]} ~ {u['months'][-1]}, 전국 합계는 {u['months'][last]}까지 ({u['values']['전국'][last]:,}호)")
-    else:
-        print("R-ONE 키가 없어 거래량은 건너뜀")
-    if ecos:
-        out["rates"] = ecos_rates(ecos)
-        print(f"ECOS 금리: {list(out['rates']['values'])}, {out['rates']['months'][0]} ~ {out['rates']['months'][-1]}")
-    else:
-        print("ECOS 키가 없어 금리는 건너뜀")
-    os.makedirs(os.path.join(ROOT, "cache"), exist_ok=True)
-    with open(os.path.join(ROOT, "cache", "extra.json"), "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    failures = 0
+    for key, fetcher, auth in [('apt_trades', rone_apt_trades, rone), ('unsold', rone_unsold, rone), ('rates', ecos_rates, ecos)]:
+        if source and source != key:
+            continue
+        try:
+            if not auth:
+                raise ValueError('missing_key')
+            data = fetcher(auth)
+            if not valid_feed(data):
+                raise ValueError('invalid_series')
+            data['collected'] = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M KST')
+            write(Path(ROOT) / 'cache/published/extra' / (key + '.json'), data)
+            print(f'{key}: {data["months"][0]} ~ {data["months"][-1]}', flush=True)
+        except Exception as error:
+            failures += 1
+            print(f'{key}: failed ({type(error).__name__}); previous data retained', flush=True)
+    write(Path(ROOT) / 'cache/extra.json', load_extra(ROOT))
+    return 1 if failures else 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source', choices=['apt_trades', 'unsold', 'rates'])
+    sys.exit(main(parser.parse_args().source))

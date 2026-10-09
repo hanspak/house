@@ -90,8 +90,8 @@ def build(fetch=True, drive=False):
     if not os.path.exists(os.path.join(ROOT, "cache", "trades.json")):
         return write_placeholder()
     tr = normalize_trades(json.load(open(os.path.join(ROOT, "cache", "trades.json"), encoding="utf-8")))
-    extra_path = os.path.join(ROOT, "cache", "extra.json")
-    extra = json.load(open(extra_path, encoding="utf-8")) if os.path.exists(extra_path) else {}
+    from market_extra import load_extra
+    extra = load_extra(ROOT)
     if 'apt_trades' in extra:
         extra['apt_trades'] = normalize_rone(extra['apt_trades'])
 
@@ -148,7 +148,17 @@ def build_snapshot(path=None):
         candidates.append(data)
     if not candidates:
         raise SystemExit('게시 가능한 전국 집계 자료가 없습니다.')
-    return render(max(candidates, key=lambda d: d['collected']))
+    data = max(candidates, key=lambda d: d['collected'])
+    from market_extra import load_extra
+    extra = load_extra(ROOT)
+    for key in ('apt_trades', 'unsold', 'rates'):
+        feed = extra.get(key)
+        old = data.get('extra', {}).get(key, {})
+        if feed and (feed.get('collected') or '') >= (old.get('collected', data.get('extra', {}).get('collected')) or ''):
+            data.setdefault('extra', {})[key] = feed
+    data['recovery'] = trade_recovery(data.get('extra', {}).get('apt_trades'), data['partial_from'])
+    data['sources'] = source_dates(data)
+    return render(data)
 
 
 def render(data):

@@ -10,6 +10,7 @@ from pathlib import Path
 from trade_regions import PROVINCES, KB_NAMES, districts
 from housing_moveins import shift
 from data_health import report, kst_today
+from collection_runs import summary
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -215,6 +216,7 @@ def build():
     part.write_bytes(payload)
     part.replace(folder / filename)
     data['revision_file'] = 'overview-data/' + filename
+    data['collection_status'] = summary(ROOT)
     template = (ROOT / 'scripts/overview_template.html').read_text(encoding='utf-8')
     comparison = (ROOT / 'scripts/overview_comparison.js').read_text(encoding='utf-8')
     html = template.replace('/*COMPARISON*/', comparison).replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
