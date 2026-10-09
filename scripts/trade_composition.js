@@ -17,5 +17,13 @@
    delta:r.share!==null&&b[i].share!==null?r.share-b[i].share:null,
    status:[r.status?'최근: '+r.status:'',b[i].status?'전년: '+b[i].status:''].filter(Boolean).join(' / ')}));
  }
- return Object.freeze({total,partition,compare});
+ function largestChange(rows,current,previous){
+  const held=status=>({group:null,delta:null,status});
+  if(!count(current)||!count(previous))return held('자료 누락으로 비교 보류');
+  if(current<10||previous<10)return held('최근·전년 모두 전체 거래 10건 이상일 때 비교');
+  if(!Array.isArray(rows)||rows.length!==4||rows.some(r=>typeof r.delta!=='number'||!Number.isFinite(r.delta)||r.status))return held('자료 누락 또는 구간 합계 불일치');
+  const group=rows.reduce((best,r,i)=>Math.abs(r.delta)>Math.abs(rows[best].delta)?i:best,0);
+  return rows[group].delta===0?{group:null,delta:0,status:'모든 구간 비중 동일'}:{group,delta:rows[group].delta,status:'비교 가능'};
+ }
+ return Object.freeze({total,partition,compare,largestChange});
 });

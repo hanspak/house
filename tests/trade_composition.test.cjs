@@ -17,3 +17,27 @@ test('missing groups or inconsistent sums hold all shares and unknown counts',()
 test('zero total holds shares and comparisons, but retains real counts',()=>{
  const rows=C.compare(10,0,[5,0,0],[0,0,0]);assert(rows.every(r=>r.delta===null&&r.previous===0&&r.previousShare===null));assert.equal(rows[2].share,0);
 });
+test('largest absolute change includes unknown and uses first group for ties',()=>{
+ const rows=C.compare(100,100,[10,10,10],[30,20,20]);
+ assert.deepEqual(C.largestChange(rows,100,100),{group:3,delta:40,status:'비교 가능'});
+ const tied=C.compare(100,100,[40,20,20],[20,40,20]);
+ assert.equal(C.largestChange(tied,100,100).group,0);
+ const negative=C.compare(100,100,[10,30,30],[70,10,10]);
+ assert.equal(C.largestChange(negative,100,100).delta,-60);
+});
+test('both regional totals must reach ten; threshold is not a group sample',()=>{
+ const rows=C.compare(10,10,[1,3,3],[0,4,3]);
+ assert.equal(C.largestChange(rows,10,10).group,0);
+ for(const totals of [[9,10],[10,9],[0,10]]){
+  const r=C.largestChange(rows,...totals);assert.equal(r.delta,null);assert.equal(r.group,null);assert.match(r.status,/10건/);
+ }
+});
+test('missing, invalid sums or nonfinite changes hold the regional comparison',()=>{
+ for(const rows of [C.compare(20,20,[null,1,2],[1,1,2]),C.compare(20,20,[10,10,10],[1,1,2]),[{delta:NaN},{delta:0},{delta:0},{delta:0}],[]]){
+  assert.equal(C.largestChange(rows,20,20).delta,null);
+ }
+ assert.match(C.largestChange(C.compare(20,20,[1,1,2],[1,1,2]),null,20).status,/누락/);
+});
+test('unchanged shares do not invent a dominant group',()=>{
+ assert.deepEqual(C.largestChange(C.compare(100,200,[30,20,10],[60,40,20]),100,200),{group:null,delta:0,status:'모든 구간 비중 동일'});
+});
