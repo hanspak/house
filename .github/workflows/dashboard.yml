@@ -9,7 +9,8 @@ name: 국면판 갱신
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 매일 09:00 KST (UTC 00:00)
+    # 정각은 GitHub 대기열이 몰려 몇 시간씩 늦게 시작하므로, 새벽 비정각에 예약해 오전 9시 전에 끝나게 한다.
+    - cron: "17 18 * * *"  # 매일 03:17 KST (UTC 18:17)
   workflow_dispatch:       # Actions 탭의 "Run workflow" 버튼으로 즉시 실행
     inputs:
       publish_only:

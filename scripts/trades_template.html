@@ -665,7 +665,9 @@ function header(){
   }
   $("#filter-status").textContent=`실거래·소액 목록: ${D.filters.area[state.area]} / ${D.filters.age[state.age]} (${D.filters.year}년 기준). 연식은 건축연도 기준이며 조건 선택 시 미확인 값은 제외합니다. R-ONE·금리는 전체 자료입니다.`;
   $("#source-status").innerHTML=`<table><thead><tr><th>자료</th><th>최신 자료 기간</th><th>수집일</th><th>기준</th></tr></thead><tbody>${(D.sources||[]).map(x=>`<tr><td>${x.name}</td><td>${x.period||'–'}</td><td>${x.collected||'기록 없음'}</td><td>${x.basis}</td></tr>`).join('')}</tbody></table>`;
-  $("#collected").textContent=D.collected+(D.failed?` · 미수집·실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=regionLabel(state.gu);
+  // 실거래·R-ONE·ECOS 중 가장 최근 수집 시각을 보이고, 실거래가 그보다 오래됐으면 따로 밝힌다.
+  const latestCollected=(D.sources||[]).map(x=>x.collected||'').reduce((a,b)=>b>a?b:a,D.collected);
+  $("#collected").textContent=latestCollected+(latestCollected>D.collected?` (실거래 ${D.collected})`:'')+(D.failed?` · 미수집·실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=regionLabel(state.gu);
   const a=AG[state.type][state.gu];
   $("#data-status").textContent=a.n.every(v=>!ok(v))?"이 지역의 실거래 수집이 아직 완료되지 않았습니다. 거래량·미분양·금리는 별도 자료로 표시합니다.":a.n.some(v=>!ok(v))?"일부 월의 실거래 수집이 완료되지 않아 해당 통계는 –로 표시합니다. 소액 목록에는 수집된 거래만 표시합니다.":"";
   $("#kpis").innerHTML=[[`${TN[state.type]} 거래 ${p3label}`,count(sum(a.n,last3))+"건",""],[`㎡당 중위`,won(periodMedian(a,"ppa",last3)),""],[`중위 거래가`,won(periodMedian(a,"price",last3)),""]].map(([t,v])=>`<div class="kpi"><div class="k">${t}</div><div class="v">${v}</div></div>`).join("");
