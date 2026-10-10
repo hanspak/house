@@ -98,7 +98,7 @@ class CollectionTests(unittest.TestCase):
             path = Path(collector.CACHE) / 'apt/11110_202608.json'
             path.parent.mkdir(parents=True)
             path.write_text(json.dumps([row(10000)] * 2))
-            result = collector.collect(2)
+            result = collector.collect(2, upgrade_limit=0)  # 이전 형식 캐시 다시 받기는 test_trade_signals에서 확인
             self.assertEqual(api.call_count, 17)
             self.assertEqual(len(result['trades']['apt']['서울|종로구']), 4)
             self.assertEqual(result['missing']['apt']['부산|중구'], ['2026-09'])

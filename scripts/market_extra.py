@@ -1,4 +1,4 @@
-"""한국부동산원 R-ONE(아파트 매매 거래량, 미분양)과 한국은행 ECOS(금리)를 받아 cache/extra.json으로 저장한다.
+"""한국부동산원 R-ONE(아파트 매매 거래량, 매입자 거주지·연령, 미분양)과 한국은행 ECOS(금리)를 받아 cache/extra.json으로 저장한다.
 
 사용법: python3 scripts/market_extra.py
 
@@ -29,6 +29,16 @@ RONE_COUNT_ITEM = 100001  # 동(호)수
 # R-ONE 미분양주택현황 — 시·도 '계'와 시군구. 전국 합계는 없어 시·도 '계'를 더한다.
 RONE_UNSOLD = "T237973129847263"
 CAPITAL = {"서울", "인천", "경기"}
+# R-ONE (월) 매입자거주지별·매입자연령대별 아파트매매거래현황 — 전국·시도·시군구, 동(호)수.
+# 화면에 필요한 구분만 구분별로 따로 요청한다(전체 구분을 받으면 행이 많아 GitHub Actions에서 느리다).
+RONE_BUYERS = {
+    "buyer_residence": ("A_2024_00609", {500001: "합계", 500002: "관할시군구내", 500004: "관할시도외_서울", 500005: "관할시도외_기타"},
+                        "한국부동산원 R-ONE (월) 매입자거주지별 아파트매매거래현황"),
+    "buyer_age": ("A_2024_00610", {500001: "합계", 500002: "20대이하", 500003: "30대"},
+                  "한국부동산원 R-ONE (월) 매입자연령대별 아파트매매거래현황"),
+}
+BUYER_START = "201901"
+BUYER_REFRESH_MONTHS = 6  # 매입자 자료는 정정이 드물어 최근 6개월만 다시 받는다.
 # ECOS: (통계표, 항목, 이름)
 ECOS_SERIES = [
     ("722Y001", "0101000", "기준금리"),
@@ -85,12 +95,12 @@ def rone_rows(key, **q):
 RONE_REFRESH_MONTHS = 24
 
 
-def refresh_start(previous, default):
-    """이전 자료의 마지막 달에서 RONE_REFRESH_MONTHS개월 전(YYYYMM). 이전 자료가 없으면 default(전체 기간)."""
+def refresh_start(previous, default, months=None):
+    """이전 자료의 마지막 달에서 months(기본 RONE_REFRESH_MONTHS)개월 전(YYYYMM). 이전 자료가 없으면 default(전체 기간)."""
     if not valid_feed(previous):
         return default
     y, m = map(int, previous['months'][-1].split('-'))
-    m -= RONE_REFRESH_MONTHS - 1
+    m -= (months or RONE_REFRESH_MONTHS) - 1
     while m < 1:
         y, m = y - 1, m + 12
     return max(default, f"{y:04d}{m:02d}")
@@ -127,6 +137,52 @@ def rone_apt_trades(key, start="200601", previous=None):
             "values": {n: [s.get(m) for m in months] for n, s in series.items()},
             "source": "한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황"})
     return merge_feed(previous, fresh)
+
+
+def merge_groups(previous, fresh):
+    """합계(values)와 구분별 시계열(groups)을 모두 이전 자료와 합친다. 모든 구분이 같은 months를 쓴다."""
+    merged = merge_feed(previous, fresh)
+    old = previous.get('groups') if valid_feed(previous) and isinstance(previous.get('groups'), dict) else {}
+    window = set(fresh['months'])
+
+    def combine(old_series, new_series):
+        before = {n: dict(zip(previous['months'], a)) for n, a in (old_series or {}).items()}
+        after = {n: dict(zip(fresh['months'], a)) for n, a in new_series.items()}
+        return {n: [(after.get(n, {}) if m in window else before.get(n, {})).get(m) for m in merged['months']]
+                for n in list(before) + [n for n in after if n not in before]}
+    merged['groups'] = {name: combine(old.get(name), series) for name, series in fresh['groups'].items()}
+    return merged
+
+
+def rone_buyers(key, kind, previous=None):
+    """매입자 거주지·연령 구분별 아파트 매매 건수. values = 합계, groups = {구분: {지역: [...]}}."""
+    table, classes, source = RONE_BUYERS[kind]
+    end = dt.date.today().strftime("%Y%m")
+    start = refresh_start(previous, BUYER_START, BUYER_REFRESH_MONTHS)
+    groups = {}
+    for cls_id, name in classes.items():
+        rows = rone_rows(key, STATBL_ID=table, DTACYCLE_CD="MM", ITM_ID=RONE_COUNT_ITEM, CLS_ID=cls_id,
+                         START_WRTTIME=start, END_WRTTIME=end)
+        series = {}
+        for r in rows:
+            if r.get("GRP_FULLNM"):
+                series.setdefault(r["GRP_FULLNM"], {})[r["WRTTIME_IDTFR_ID"]] = r["DTA_VAL"]
+        groups[name] = series
+    months = sorted({m for s in groups.values() for v in s.values() for m in v})
+    normalized = {name: normalize_rone({"months": [f"{m[:4]}-{m[4:]}" for m in months],
+                                        "values": {g: [v.get(m) for m in months] for g, v in s.items()}})["values"]
+                  for name, s in groups.items()}
+    fresh = {"months": [f"{m[:4]}-{m[4:]}" for m in months], "values": normalized["합계"],
+             "groups": normalized, "source": source}
+    return merge_groups(previous, fresh)
+
+
+def rone_buyer_residence(key, previous=None):
+    return rone_buyers(key, "buyer_residence", previous)
+
+
+def rone_buyer_age(key, previous=None):
+    return rone_buyers(key, "buyer_age", previous)
 
 
 def _last_month(back=1):
@@ -198,6 +254,9 @@ def valid_feed(data):
             any(v is not None for a in values.values() for v in a))
 
 
+FEEDS = ('apt_trades', 'buyer_residence', 'buyer_age', 'unsold', 'rates')
+
+
 def load_extra(root=ROOT):
     root = Path(root)
     out, candidates = {}, []
@@ -214,7 +273,7 @@ def load_extra(root=ROOT):
             candidates.append(json.loads(path.read_text(encoding='utf-8')))
         except (OSError, ValueError):
             print('Unreadable extra cache skipped', flush=True)
-    for key in ('apt_trades', 'unsold', 'rates'):
+    for key in FEEDS:
         feeds = [{**c[key], 'collected': c[key].get('collected', c.get('collected'))}
                  for c in candidates if isinstance(c, dict) and valid_feed(c.get(key))]
         path = root / 'cache/published/extra' / (key + '.json')
@@ -236,7 +295,9 @@ def main(source=None):
     rone, ecos = keys()
     failures = 0
     baseline = load_extra(ROOT)
-    for key, fetcher, auth in [('apt_trades', rone_apt_trades, rone), ('unsold', rone_unsold, rone), ('rates', ecos_rates, ecos)]:
+    fetchers = {'apt_trades': (rone_apt_trades, rone), 'buyer_residence': (rone_buyer_residence, rone),
+                'buyer_age': (rone_buyer_age, rone), 'unsold': (rone_unsold, rone), 'rates': (ecos_rates, ecos)}
+    for key, (fetcher, auth) in fetchers.items():
         if source and source != key:
             continue
         try:
@@ -270,5 +331,5 @@ def main(source=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', choices=['apt_trades', 'unsold', 'rates'])
+    parser.add_argument('--source', choices=list(FEEDS))
     sys.exit(main(parser.parse_args().source))

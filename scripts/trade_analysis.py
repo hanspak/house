@@ -127,7 +127,8 @@ def trade_recovery(series, partial_from):
 
 def source_dates(data):
     result = [{'name': '국토부 실거래', 'period': data['months'][-1], 'collected': data['collected'], 'basis': '계약월 · 최근월 집계 중'}]
-    for key, label, basis in [('apt_trades', 'R-ONE 거래량', '공식 거래통계'), ('unsold', '미분양', '월말 현황'), ('rates', 'ECOS 금리', '전국 공통')]:
+    for key, label, basis in [('apt_trades', 'R-ONE 거래량', '공식 거래통계'), ('buyer_residence', 'R-ONE 매입자 거주지', '공식 거래통계'),
+                              ('buyer_age', 'R-ONE 매입자 연령', '공식 거래통계'), ('unsold', '미분양', '월말 현황'), ('rates', 'ECOS 금리', '전국 공통')]:
         series = data.get('extra', {}).get(key)
         if series:
             available = [i for i in range(len(series['months'])) if any(i < len(v) and v[i] is not None for v in series['values'].values())]

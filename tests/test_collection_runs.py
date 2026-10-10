@@ -60,7 +60,7 @@ class CollectionTests(unittest.TestCase):
             for _ in range(32):
                 runs.execute(self.root, 'rates', ['python'], 2)
         self.assertEqual(len(runs.read(self.path)['events']), 30)
-        self.assertEqual(len(runs.summary(self.root)), 8)
+        self.assertEqual(len(runs.summary(self.root)), len(runs.NAMES))
 
     def seed(self):
         feed = {'months': ['2026-08'], 'values': {'region': [1]}, 'source': 'test'}

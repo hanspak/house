@@ -7,7 +7,7 @@ import signal
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-NAMES = ('trades', 'apt_trades', 'unsold', 'rates', 'rents', 'supply', 'pipeline', 'moveins')
+NAMES = ('trades', 'apt_trades', 'buyer_residence', 'buyer_age', 'unsold', 'rates', 'rents', 'supply', 'pipeline', 'moveins')
 
 
 def stamp():

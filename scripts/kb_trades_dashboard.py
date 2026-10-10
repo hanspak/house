@@ -23,11 +23,13 @@ from trade_regions import PROVINCES, KB_NAMES, districts, normalize_trades, norm
 from trade_analysis import (aggregate_profiles, trade_recovery, source_dates,
                             ANALYSIS_VERSION, MIN_PRICE_SAMPLE, AREA_OPTIONS, AGE_OPTIONS)
 from overview_data import save as save_overview
+import trade_signals
 from data_revisions import save_published
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOW_PRICES = [10000, 15000, 20000]  # 만원: 1억, 1.5억, 2억 (목록에 담는 최대치는 2억)
 TYPE_NAMES = {"apt": "아파트", "rh": "연립·다세대", "offi": "오피스텔"}
+BUYER_FEEDS = ('buyer_residence', 'buyer_age')  # 크기가 커서 페이지에 넣지 않고 신호 파일로 따로 게시한다.
 
 
 def aggregate(tr):
@@ -121,6 +123,7 @@ def build(fetch=True, drive=False):
     data['min_price_sample'] = MIN_PRICE_SAMPLE
     data['recovery'] = trade_recovery(extra.get('apt_trades'), data['partial_from'])
     data['sources'] = source_dates(data)
+    data['signals'] = trade_signals.build(tr, districts())
     if not data['failed']:
         save_snapshot(data, os.path.join(ROOT, 'cache', 'published', 'trades.json.gz'))
     return render(data)
@@ -149,9 +152,9 @@ def build_snapshot(path=None):
     if not candidates:
         raise SystemExit('게시 가능한 전국 집계 자료가 없습니다.')
     data = max(candidates, key=lambda d: d['collected'])
-    from market_extra import load_extra
+    from market_extra import load_extra, FEEDS
     extra = load_extra(ROOT)
-    for key in ('apt_trades', 'unsold', 'rates'):
+    for key in FEEDS:
         feed = extra.get(key)
         old = data.get('extra', {}).get(key, {})
         if feed and (feed.get('collected') or '') >= (old.get('collected', data.get('extra', {}).get('collected')) or ''):
@@ -161,22 +164,30 @@ def build_snapshot(path=None):
     return render(data)
 
 
+def write_asset(asset_dir, prefix, value):
+    """내용 해시를 붙인 JSON 파일로 저장하고 화면에서 읽을 경로를 돌려준다."""
+    payload = json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    name = prefix + '.' + hashlib.sha256(payload).hexdigest()[:12] + '.json'
+    with open(os.path.join(asset_dir, name + '.part'), 'wb') as f:
+        f.write(payload)
+    os.replace(os.path.join(asset_dir, name + '.part'), os.path.join(asset_dir, name))
+    return 'trades-data/' + name
+
+
 def render(data):
-    save_overview('trades', {k: data[k] for k in ('months', 'collected', 'partial_from', 'agg', 'extra', 'recovery', 'sources', 'revision_history') if k in data}, ROOT)
     data = dict(data)
+    extra = data.get('extra', {})
+    data['extra'] = {k: v for k, v in extra.items() if k not in BUYER_FEEDS}
+    save_overview('trades', {k: data[k] for k in ('months', 'collected', 'partial_from', 'agg', 'extra', 'recovery', 'sources', 'revision_history') if k in data}, ROOT)
     data.pop('revision_history', None)  # 이력은 종합 화면의 별도 JSON에서만 읽는다.
     profiles = data.pop('profiles', {})
     out_dir = os.path.join(ROOT, 'dashboard')
     asset_dir = os.path.join(out_dir, 'trades-data')
     os.makedirs(asset_dir, exist_ok=True)
-    data['profile_files'] = {}
-    for profile, stats in profiles.items():
-        payload = json.dumps(stats, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-        name = profile + '.' + hashlib.sha256(payload).hexdigest()[:12] + '.json'
-        with open(os.path.join(asset_dir, name + '.part'), 'wb') as f:
-            f.write(payload)
-        os.replace(os.path.join(asset_dir, name + '.part'), os.path.join(asset_dir, name))
-        data['profile_files'][profile] = 'trades-data/' + name
+    data['profile_files'] = {profile: write_asset(asset_dir, profile, stats) for profile, stats in profiles.items()}
+    # 거래 신호(반복거래 지수·최고가 경신·거래 주체)와 매입자 자료는 해당 구역을 열 때 읽는다.
+    data['signals_file'] = write_asset(asset_dir, 'signals', {
+        'trade': data.pop('signals', None), 'buyers': {k: extra[k] for k in BUYER_FEEDS if k in extra}})
     with open(os.path.join(ROOT, "scripts", "trades_template.html"), encoding="utf-8") as f:
         tpl = f.read()
     with open(os.path.join(os.path.dirname(__file__), "profile_loader.js"), encoding="utf-8") as f:

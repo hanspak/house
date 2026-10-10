@@ -9,6 +9,8 @@
 - 월·시군구·유형별 응답을 cache/molit/<유형>/<시군구코드>_<YYYYMM>.json 에 저장한다.
   신고 기한(계약 후 30일)과 해제 신고를 반영하려고 최근 3개월은 매번 다시 받고, 그 이전 달은 캐시를 쓴다.
 - 해제된 거래(cdealType = 'O')는 제외한다.
+- 행 = [계약일, 법정동, 이름, 전용면적, 층, 금액, 건축연도, 주택유형, 지번, 거래방식, 매수자, 매도자, 단지번호].
+  뒤의 4칸은 2026-10에 추가했다. 이전 형식(9칸) 캐시는 실행마다 --upgrade-limit개씩 최근 달부터 다시 받는다.
 - 금액 단위는 만원, 면적은 전용 ㎡.
 """
 import argparse
@@ -34,6 +36,8 @@ TYPES = {
     "offi": ("RTMSDataSvcOffiTrade", "getRTMSDataSvcOffiTrade", "offiNm"),
 }
 REFRESH_MONTHS = 3
+ROW_WIDTH = 13  # 현재 행 형식의 칸 수. 이보다 짧은 캐시는 이전 형식이다.
+BASE_WIDTH = 9  # 이전 형식과 공통인 앞쪽 칸 (코드 간 중복 판정에 쓴다)
 REQUEST_INTERVAL = 0.25  # 서비스별 초당 최대 4회. 여러 스레드의 순간 요청 집중을 피한다.
 REQUEST_LOCK = threading.Lock()
 NEXT_REQUEST = {}
@@ -107,6 +111,7 @@ def fetch(key, kind, lawd, ym):
                 int(f["floor"]) if f.get("floor", "").lstrip("-").isdigit() else None,
                 amount, int(f["buildYear"]) if f.get("buildYear", "").isdigit() else None,
                 f.get("houseType", ""), f.get("jibun", ""),
+                f.get("dealingGbn", ""), f.get("buyerGbn", ""), f.get("slerGbn", ""), f.get("aptSeq", ""),
             ])
         total = int(root.findtext(".//totalCount") or 0)
         if page * 1000 >= total:
@@ -114,20 +119,36 @@ def fetch(key, kind, lawd, ym):
         page += 1
 
 
-def collect(months=24, workers=4, cached_only=False):
-    if months < 1 or workers < 1:
-        raise ValueError("months와 workers는 1 이상이어야 합니다")
+def outdated(path):
+    """이전 형식(거래방식·매수자·매도자·단지번호가 없는) 캐시인지. 거래가 없는 달은 형식과 무관하다."""
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)
+    return bool(rows) and len(rows[0]) < ROW_WIDTH
+
+
+def collect(months=24, workers=4, cached_only=False, upgrade_limit=1500):
+    if months < 1 or workers < 1 or upgrade_limit < 0:
+        raise ValueError("months와 workers는 1 이상, upgrade_limit은 0 이상이어야 합니다")
     key = None if cached_only else api_key()
     yms = months_back(months)
     refresh = set(yms[-REFRESH_MONTHS:])
     jobs = [(k, l, ym) for l in REGIONS for ym in yms for k in TYPES]
     stats = {"api": 0, "cache": 0}
+    # 이전 형식 캐시를 최근 달부터 upgrade_limit개만 다시 받는다(API 일일 한도와 실행 시간 제한 때문).
+    upgrade = set()
+    if not cached_only and upgrade_limit:
+        stale = sorted(((ym, k, l) for k, l, ym in jobs
+                        if ym not in refresh and os.path.exists(os.path.join(CACHE, k, f"{l}_{ym}.json"))
+                        and outdated(os.path.join(CACHE, k, f"{l}_{ym}.json"))), reverse=True)
+        upgrade = {(k, l, ym) for ym, k, l in stale[:upgrade_limit]}
+        if stale:
+            print(f"이전 형식 캐시 {len(stale)}건 중 {len(upgrade)}건을 다시 받습니다.", flush=True)
     cached_times = []
 
     def one(job):
         kind, lawd, ym = job
         path = os.path.join(CACHE, kind, f"{lawd}_{ym}.json")
-        if (cached_only or ym not in refresh) and os.path.exists(path):
+        if (cached_only or ym not in refresh) and job not in upgrade and os.path.exists(path):
             stats["cache"] += 1
             cached_times.append(os.path.getmtime(path))
             with open(path, encoding="utf-8") as f:
@@ -169,11 +190,13 @@ def collect(months=24, workers=4, cached_only=False):
             else:
                 # 개편 전·후 코드가 같은 과거 자료를 돌려줄 때만 중복을 제거한다.
                 # 한 코드 안의 동일한 거래 여러 건은 유지한다 (행만으로 거래 ID를 알 수 없음).
+                # 이전 형식과 새 형식 캐시가 섞여 있어도 같은 거래로 보도록 공통 앞쪽 칸으로 비교한다.
                 seen = counts[kind].setdefault(rid, Counter())
-                batch = Counter(tuple(r) for r in rows)
-                for row, n in batch.items():
-                    out[kind][rid].extend([list(row) for _ in range(max(0, n - seen[row]))])
-                    seen[row] = max(seen[row], n)
+                batch = Counter(tuple(r[:BASE_WIDTH]) for r in rows)
+                full = {tuple(r[:BASE_WIDTH]): r for r in rows}
+                for base, n in batch.items():
+                    out[kind][rid].extend([list(full[base]) for _ in range(max(0, n - seen[base]))])
+                    seen[base] = max(seen[base], n)
             if i % 500 == 0:
                 print(f"실거래 수집 진행: {i}/{len(jobs)} (실패 {len(failed)}건)", flush=True)
     if failed:
@@ -184,7 +207,8 @@ def collect(months=24, workers=4, cached_only=False):
     collected = (dt.datetime.fromtimestamp(max(cached_times), dt.timezone(dt.timedelta(hours=9)))
                  if cached_only and cached_times else dt.datetime.now(dt.timezone(dt.timedelta(hours=9))))
     data = {
-        "fields": ["date", "dong", "name", "area", "floor", "amount", "build_year", "house_type", "jibun"],
+        "fields": ["date", "dong", "name", "area", "floor", "amount", "build_year", "house_type", "jibun",
+                   "dealing", "buyer", "seller", "complex"],
         "months": [f"{y[:4]}-{y[4:]}" for y in yms],
         "collected": collected.strftime("%Y-%m-%d %H:%M KST"),
         "trades": out,
@@ -206,5 +230,6 @@ if __name__ == "__main__":
     ap.add_argument("--months", type=int, default=24)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--cached-only", action='store_true', help='월별 캐시만 모으고 미수집 월을 표시')
+    ap.add_argument("--upgrade-limit", type=int, default=1500, help='이전 형식 캐시를 다시 받는 최대 건수(최근 달부터)')
     args = ap.parse_args()
-    collect(args.months, args.workers, args.cached_only)
+    collect(args.months, args.workers, args.cached_only, args.upgrade_limit)

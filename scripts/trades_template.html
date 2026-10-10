@@ -656,7 +656,98 @@ def(13,'거래 구성 변화','가격 변화와 함께 거래된 주택의 면�
  };
  button.onclick=load;if(compositionOpen)load();
 });
-const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","전국 시·도 · 최근 24개월 · 계약월 기준",[2,3,11,13,4,5,6]],["g-vol","거래량·미분양·금리","",[12,7,10,8,9]]];
+// ---------- 거래 신호 (반복거래 지수·최고가 경신·거래 주체·매입자) ----------
+// 전체 면적·연식 기준 자료라 화면의 면적·연식 필터와 별개다. 크기가 커서 처음 그릴 때 따로 읽는다.
+const SIGNAL_MIN=20; // 비율·지수를 표시하는 최소 건수(표시 기준이며 통계적 신뢰 기준이 아님)
+let SIG=null,sigError=false,sigWaiting=false;
+function needSignals(box){
+  if(SIG)return false;
+  box.innerHTML=`<div class="empty">${sigError?'거래 신호 자료를 읽지 못했습니다. 새로고침해 다시 시도하세요.':!D.signals_file?'거래 신호 자료가 아직 없습니다. 다음 수집 후 표시됩니다.':'거래 신호 자료를 읽는 중입니다…'}</div>`;
+  if(D.signals_file&&!sigError&&!sigWaiting){sigWaiting=true;const t=renderId;
+    fetch(D.signals_file).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json();}).then(s=>{SIG=s;}).catch(()=>{sigError=true;})
+      .finally(()=>{sigWaiting=false;if(t===renderId)paint();});}
+  return true;
+}
+const tradeSignal=()=>SIG?.trade&&SIG.trade.months.join()===MS.join()?SIG.trade.kinds?.[state.type]?.[state.gu]:null;
+const share=(num,den,min=SIGNAL_MIN)=>num.map((v,i)=>ok(v)&&ok(den[i])&&den[i]>=min?v/den[i]*100:null);
+const lastFull=a=>{for(let i=a.length-1;i>=0;i--)if(ok(a[i])&&!partial(MS[i]))return i;return -1;};
+function shadePartial(r,h,m){const pi=MS.findIndex(partial);if(pi>=0)el("rect",{x:r.X(pi)-4,y:m.t,width:r.X(MS.length-1)-r.X(pi)+8,height:h-m.t-m.b,fill:css("--ink-3"),opacity:.1},r.svg);}
+function addNote(box,cls,html){const p=document.createElement("p");p.className=cls;p.innerHTML=html;box.appendChild(p);return p;}
+
+def(16,"반복거래 가격지수","같은 집이 다시 거래될 때 가격은 얼마나 변했나",false,box=>{
+  if(needSignals(box))return;const s=tradeSignal(),g=state.gu,k=state.type;
+  if(!s||!s.index.some(ok))return box.innerHTML='<div class="empty">이 지역·유형은 반복거래 쌍이 적어 지수를 만들지 못했습니다</div>';
+  const base=s.index.findIndex(ok),pp=monthlyPrice(D.agg[k][g],"ppa"),norm=pp.map(v=>ok(v)&&ok(pp[base])?v/pp[base]*100:null);
+  addNote(box,"sub",`${regionLabel(g)} ${TN[k]} · ${MS[base]} = 100 · 전체 면적·연식 · 음영 = 신고 집계 중`);
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:44,r:110,t:10,b:24},h=230;
+  const series=[{v:s.index,c:SER[0],wd:2.4,end:true,n:"반복거래 지수"},{v:norm,c:SER[2],wd:1.4,op:.8,end:true,n:"㎡당 중위가(환산)"}];
+  const r=lineChart(d_,{n:MS.length,series,w:560,h,m,yfmt:v=>v.toFixed(0),xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>반복거래 지수 ${ok(s.index[i])?s.index[i].toFixed(1):"–"} (쌍 ${count(s.pairs[i])}개)<br>㎡당 중위가 환산 ${ok(norm[i])?norm[i].toFixed(1):"–"}`});
+  shadePartial(r,h,m);endLabels(r,series.map(x=>({v:lastOk(x.v)[0],t:x.n})),MS.length);
+  const i=lastFull(s.index),j=i-12,chg=i>=0&&j>=0&&ok(s.index[j])?(s.index[i]/s.index[j]-1)*100:NaN;
+  addNote(box,"finding",i<0?"집계가 끝난 달의 지수가 없습니다.":`${MS[i]} 지수 <b>${s.index[i].toFixed(1)}</b>${ok(chg)?` · 1년 전(${MS[j]}) 대비 <b>${pct(chg,1)}</b>`:""}. 같은 법정동·지번·이름·전용면적의 직전 거래와 다음 거래의 가격 비율로 추정한 지수라, 그 달 어떤 집이 거래됐는지에 따른 중위가의 흔들림을 덜어 냅니다.`);
+  addNote(box,"sub",`층·동·수리 상태는 구분하지 않습니다. 가격이 2배 넘게 차이 나는 쌍은 다른 집이나 입력 오류일 수 있어 뺍니다. 반복거래 쌍이 ${SIG.trade.min_pairs}개 미만인 달은 비웁니다. 연립·다세대·오피스텔은 같은 집 판정이 아파트보다 부정확합니다. 최근 24개월 실거래만 쓰므로 그보다 오래 보유한 집의 거래는 쌍이 되지 않습니다.`);
+});
+
+def(17,"최고가 경신 비율","직전 1년 최고가보다 비싸게 거래된 비율은",false,box=>{
+  if(needSignals(box))return;if(!SIG.trade)return box.innerHTML='<div class="empty">거래 신호 자료가 아직 없습니다. 다음 수집 후 표시됩니다.</div>';
+  const g=state.gu,L=SIG.trade.lookback;
+  if(SIG.trade.months.join()!==MS.join())return box.innerHTML='<div class="empty">거래 신호 자료의 기간이 화면과 달라 표시하지 않습니다</div>';
+  const kinds=["apt","rh","offi"],series=kinds.map((k,j)=>{const s=SIG.trade.kinds[k]?.[g];return {v:s?share(s.new_high,s.eligible):MS.map(()=>null),c:SER[j],wd:k===state.type?2.4:1.4,op:k===state.type?1:.7,end:true,n:TN[k],s};});
+  addNote(box,"sub",`${regionLabel(g)} · 같은 단지·면적의 직전 ${L}개월 거래가 있는 거래 중 그 최고가보다 비싸게 거래된 비율(%) · 비교 대상 ${SIGNAL_MIN}건 미만인 달은 비움`);
+  if(!series.some(x=>x.v.some(ok)))return addNote(box,"empty","비교할 거래가 부족합니다.");
+  const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:96,t:10,b:24},h=220;
+  const r=lineChart(d_,{n:MS.length,series,w:560,h,m,lo:0,yfmt:v=>v.toFixed(0)+"%",xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>`+series.map(x=>`${x.n} ${ok(x.v[i])?x.v[i].toFixed(1)+"%":"–"} (${count(x.s?.new_high[i])}/${count(x.s?.eligible[i])}건)`).join("<br>")});
+  shadePartial(r,h,m);endLabels(r,series.map(x=>({v:lastOk(x.v)[0],t:x.n})),MS.length);
+  const sel=series[kinds.indexOf(state.type)],i=lastFull(sel.v),j=i-3;
+  addNote(box,"finding",i<0?`${TN[state.type]}는 비교할 거래가 부족합니다.`:`${MS[i]} ${TN[state.type]} 거래 중 <b>${sel.v[i].toFixed(1)}%</b>가 직전 ${L}개월 최고가를 넘었습니다 (${count(sel.s.new_high[i])}/${count(sel.s.eligible[i])}건)${ok(sel.v[j])?` · 3개월 전 ${sel.v[j].toFixed(1)}%`:""}. 비율이 오르면 매수자가 직전 가격보다 높은 값을 받아들이는 거래가 늘고 있다는 뜻입니다.`);
+  addNote(box,"sub",`층·향·수리 상태를 구분하지 않아, 같은 단지 안의 좋은 층 거래만으로도 경신으로 셀 수 있습니다. 최근 24개월 자료라 ${MS[L]}부터 계산합니다. 집계 중인 달은 신고가 늘며 값이 바뀝니다.`);
+});
+
+def(14,"거래 주체·방식","직거래·법인 거래가 늘고 있나",false,box=>{
+  if(needSignals(box))return;const s=tradeSignal(),g=state.gu,k=state.type;
+  if(!s)return box.innerHTML='<div class="empty">해당 지역·유형의 자료가 없습니다</div>';
+  const complete=s.n.map((n,i)=>ok(n)&&s.known[i]===n?n:null),pending=s.n.filter((n,i)=>ok(n)&&n>0&&s.known[i]<n).length;
+  const series=[["direct","직거래"],["buyer_corp","법인 매수"],["seller_corp","법인 매도"]].map(([key,n],j)=>({v:share(s[key],complete,10),c:SER[j],end:true,n,key}));
+  addNote(box,"sub",`${regionLabel(g)} ${TN[k]} · 전체 거래 중 비율(%) · 전체 면적·연식 · 그 달 거래 10건 미만은 비움`);
+  if(!series.some(x=>x.v.some(ok)))addNote(box,"empty","아직 표시할 달이 없습니다. 이전 형식으로 받아 둔 달을 다시 받는 중이며, 매일 수집 때마다 최근 달부터 채워집니다.");
+  else{const d_=document.createElement("div");box.appendChild(d_);const m={l:40,r:84,t:10,b:24},h=220;
+    const r=lineChart(d_,{n:MS.length,series,w:560,h,m,lo:0,yfmt:v=>v.toFixed(0)+"%",xlab:monthLabels(MS),hover:i=>`<b>${MS[i]}${partial(MS[i])?" (집계 중)":""}</b><br>`+(ok(complete[i])?series.map(x=>`${x.n} ${ok(x.v[i])?x.v[i].toFixed(1)+"%":"–"} (${count(s[x.key][i])}건)`).join("<br>")+`<br>전체 ${count(s.n[i])}건`:"거래 방식 항목 보강 중")});
+    shadePartial(r,h,m);endLabels(r,series.map(x=>({v:lastOk(x.v)[0],t:x.n})),MS.length);
+    const i=lastFull(series[0].v),j=i-12;
+    addNote(box,"finding",i<0?"집계가 끝난 달의 값이 아직 없습니다.":`${MS[i]} 직거래 <b>${series[0].v[i].toFixed(1)}%</b> · 법인 매수 <b>${series[1].v[i].toFixed(1)}%</b> · 법인 매도 <b>${series[2].v[i].toFixed(1)}%</b>`+(j>=0&&ok(series[0].v[j])?` (1년 전 직거래 ${series[0].v[j].toFixed(1)}%, 법인 매수 ${series[1].v[j].toFixed(1)}%)`:"")+".");}
+  addNote(box,"sub",(pending?`이전 형식으로 받아 둔 ${pending}개월은 거래 방식 항목이 없어 다시 받는 중입니다(매일 최근 달부터 채움). `:"")+"직거래에는 가족 간 거래·증여성 거래가 섞일 수 있으나 신고 자료만으로 구분할 수 없습니다. 법인은 국토부 신고의 매수자·매도자 구분 기준입니다.");
+});
+
+def(15,"매입자 거주지·연령 (부동산원)","외지인·2030 매수가 늘고 있나 (아파트)",false,box=>{
+  if(needSignals(box))return;const B=SIG.buyers||{},res=B.buyer_residence,age=B.buyer_age,key=roneKey();
+  if(!res&&!age)return box.innerHTML='<div class="empty">부동산원 매입자 자료가 아직 없습니다. 다음 수집 후 표시됩니다.</div>';
+  const district=state.gu.includes("|")&&(D.districts[province()]||[]).length>1,seoul=province()==="서울";
+  addNote(box,"sub",`${regionLabel(state.gu)} 아파트 매매 · 한국부동산원 · 얇은 선 = 월별, 굵은 선 = 12개월 합산 비율 · 선택한 주택 유형과 무관하게 아파트 자료`);
+  const roll=(num,den)=>num.map((_,i)=>{if(i<11)return null;let a=0,b=0;for(let t=i-11;t<=i;t++){if(!ok(num[t])||!ok(den[t]))return null;a+=num[t];b+=den[t];}return b>=SIGNAL_MIN?a/b*100:null;});
+  const add=(a,b)=>a.map((v,i)=>ok(v)&&ok(b[i])?v+b[i]:null),minus=(a,b)=>a.map((v,i)=>ok(v)&&ok(b[i])?v-b[i]:null);
+  const draw=(feed,title,lines)=>{
+    const total=feed?.groups?.["합계"]?.[key];
+    if(!total){addNote(box,"empty",`${title}: 이 지역 자료가 없습니다.`);return;}
+    const t=addNote(box,"sub",title);t.style.margin="10px 0 2px";
+    const series=lines.flatMap(([n,num],j)=>[{v:share(num,total),c:SER[j],wd:1,op:.4},{v:roll(num,total),c:SER[j],wd:2.2,end:true,n}]);
+    const d_=document.createElement("div");box.appendChild(d_);const ms=feed.months;
+    const r=lineChart(d_,{n:ms.length,series,w:560,h:170,m:{l:40,r:110,t:8,b:22},lo:0,yfmt:v=>v.toFixed(0)+"%",xlab:monthLabels(ms),hover:i=>`<b>${ms[i]}</b><br>`+series.filter(x=>x.n).map((x,j)=>`${x.n} ${ok(series[j*2].v[i])?series[j*2].v[i].toFixed(1)+"%":"–"} (12개월 ${ok(x.v[i])?x.v[i].toFixed(1)+"%":"–"})`).join("<br>")+`<br>전체 ${count(total[i])}호`});
+    endLabels(r,series.filter(x=>x.n).map(x=>({v:lastOk(x.v)[0],t:x.n})),ms.length);
+    return series.filter(x=>x.n).map(x=>{const [v,i]=lastOk(x.v);return ok(v)?`${x.n} <b>${v.toFixed(1)}%</b>${ok(x.v[i-12])?` (1년 전 ${x.v[i-12].toFixed(1)}%)`:""}`:null;}).filter(Boolean).join(" · ")+(lastOk(series[1].v)[1]>=0?` · 12개월 합산, ${ms[lastOk(series[1].v)[1]]}까지`:"");
+  };
+  const G=res?.groups||{},A=age?.groups||{},pick=(src,n)=>src[n]?.[key];
+  const outsideProvince=pick(G,"관할시도외_서울")&&pick(G,"관할시도외_기타")?add(pick(G,"관할시도외_서울"),pick(G,"관할시도외_기타")):null;
+  const resLines=[];if(outsideProvince)resLines.push(["다른 시·도 거주자",outsideProvince]);
+  if(district&&pick(G,"관할시군구내"))resLines.push(["다른 시·군·구 거주자",minus(pick(G,"합계"),pick(G,"관할시군구내"))]);
+  if(!seoul&&pick(G,"관할시도외_서울"))resLines.push(["서울 거주자",pick(G,"관할시도외_서울")]);
+  const f1=res?draw(res,"매입자 거주지 (같은 지역 밖에 사는 매수자 비율)",resLines):null;
+  const young=pick(A,"20대이하")&&pick(A,"30대")?add(pick(A,"20대이하"),pick(A,"30대")):null;
+  const f2=age&&young?draw(age,"매입자 연령 (20대 이하·30대 비율)",[["2030 매수",young]]):null;
+  addNote(box,"finding",[f1,f2].filter(Boolean).join("<br>")||"표시할 값이 없습니다.");
+  addNote(box,"sub","'다른 시·도 거주자'는 흔히 외지인 투자 수요의 지표로 쓰이지만, 이사·직장 이동 등 실수요도 포함합니다. 연령 '기타'(법인 등)도 분모에 들어갑니다.");
+});
+
+const GROUPS=[["g-sum","요약","",[1]],["g-trade","실거래 (국토부)","전국 시·도 · 최근 24개월 · 계약월 기준",[2,3,11,13,4,5,6]],["g-signal","거래 신호","같은 집의 가격 변화·최고가 경신·거래 주체·매입자 · 전체 면적·연식 기준 (화면의 면적·연식 필터와 별개)",[16,17,14,15]],["g-vol","거래량·미분양·금리","",[12,7,10,8,9]]];
 const FULL=new Set([1,4,5,13]);
 function header(){
   for(const key of ['area','age']){

@@ -3,7 +3,7 @@
  // 게시된 화면에서 GitHub Actions 실행 기록을 읽어, 자료 수집이 지금 진행 중인지·마지막 결과가 무엇인지 보여 준다.
  // 화면에 들어간 자료(수집일)와 별개로 "지금" 상태를 알려 주는 용도다. 인증 없이 공개 API(시간당 60회)를 쓴다.
  const WORKFLOW='dashboard.yml',BOT='github-actions[bot]';
- const STEPS=[['전국 실거래','실거래'],['R-ONE trade','R-ONE 거래량'],['R-ONE unsold','R-ONE 미분양'],['ECOS','ECOS 금리'],['공식 미분양','공식 미분양'],['공급 단계','공급 단계'],['입주예정','입주예정'],['전월세','전월세']];
+ const STEPS=[['전국 실거래','실거래'],['R-ONE trade','R-ONE 거래량'],['R-ONE buyer residence','R-ONE 매입자 거주지'],['R-ONE buyer age','R-ONE 매입자 연령'],['R-ONE unsold','R-ONE 미분양'],['ECOS','ECOS 금리'],['공식 미분양','공식 미분양'],['공급 단계','공급 단계'],['입주예정','입주예정'],['전월세','전월세']];
  const label=name=>(STEPS.find(([k])=>name.includes(k))||[])[1];
  function repo(loc){
   const host=loc?.hostname||'',seg=(loc?.pathname||'').split('/').filter(Boolean)[0];

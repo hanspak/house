@@ -186,13 +186,25 @@ jobs:
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           MOLIT_API_ATTEMPTS: "2"
-        run: python -u scripts/collection_runs.py --name trades --timeout 2100 --result cache/trades.json -- python -u scripts/molit_trades.py --workers 12
+        run: python -u scripts/collection_runs.py --name trades --timeout 2100 --result cache/trades.json -- python -u scripts/molit_trades.py --workers 12 --upgrade-limit 6000
 
       - name: R-ONE trade volume
         continue-on-error: true
         env:
           RONE_KEY: ${{ secrets.RONE_KEY }}
         run: python -u scripts/collection_runs.py --name apt_trades --timeout 300 -- python -u scripts/market_extra.py --source apt_trades
+
+      - name: R-ONE buyer residence
+        continue-on-error: true
+        env:
+          RONE_KEY: ${{ secrets.RONE_KEY }}
+        run: python -u scripts/collection_runs.py --name buyer_residence --timeout 300 -- python -u scripts/market_extra.py --source buyer_residence
+
+      - name: R-ONE buyer age
+        continue-on-error: true
+        env:
+          RONE_KEY: ${{ secrets.RONE_KEY }}
+        run: python -u scripts/collection_runs.py --name buyer_age --timeout 300 -- python -u scripts/market_extra.py --source buyer_age
 
       - name: R-ONE unsold homes
         continue-on-error: true

@@ -95,13 +95,14 @@ def record(root, source, kind, region_code, period, body, fmt, rows=None,
 
 
 def save_rows(root, source, kind, code, month, rows, **kwargs):
-    width = 9 if source == 'trades' else 11 if source == 'rents' else None
+    # 실거래는 이전 형식 9칸과 거래방식·매수자·매도자·단지번호를 더한 13칸을 모두 받는다.
+    width = (9, 13) if source == 'trades' else (11,) if source == 'rents' else None
     if width is None or kind not in (('apt', 'rh', 'offi') if source == 'trades' else ('apt',)) or not re.fullmatch(r'\d{5}', str(code)) or not re.fullmatch(r'\d{4}(0[1-9]|1[0-2])', str(month)):
         raise ValueError('Invalid transaction scope')
     if not isinstance(rows, list):
         raise ValueError('Invalid transaction rows')
     for row in rows:
-        if not isinstance(row, list) or len(row) != width or not isinstance(row[0], str):
+        if not isinstance(row, list) or len(row) not in width or not isinstance(row[0], str):
             raise ValueError('Invalid transaction row')
         date = dt.date.fromisoformat(row[0])
         if date.strftime('%Y%m') != month:

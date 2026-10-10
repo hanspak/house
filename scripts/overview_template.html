@@ -55,7 +55,7 @@ RunStatus.load(document.getElementById('run-status'));
 const D=/*DATA*/;
 const $=s=>document.querySelector(s),valid=v=>typeof v==='number'&&Number.isFinite(v),label=r=>r.replace('|',' ');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const collectionNames={trades:'국토부 매매',apt_trades:'R-ONE 거래량',unsold:'R-ONE 미분양',rates:'ECOS 금리',rents:'아파트 전월세',supply:'공식 미분양',pipeline:'공급 실적',moveins:'입주예정'};
+const collectionNames={trades:'국토부 매매',apt_trades:'R-ONE 거래량',buyer_residence:'R-ONE 매입자 거주지',buyer_age:'R-ONE 매입자 연령',unsold:'R-ONE 미분양',rates:'ECOS 금리',rents:'아파트 전월세',supply:'공식 미분양',pipeline:'공급 실적',moveins:'입주예정'};
 const collectionLabels={success:'성공',failure:'실패',partial:'일부 수집 실패',timeout:'시간 초과',interrupted:'중단',running:'종료 미확인'};
 function renderCollections(){$('#collections').innerHTML='<thead><tr><th>자료</th><th>마지막 시도</th><th>결과</th><th>종료 시각</th><th>마지막 성공</th></tr></thead><tbody>'+(D.collection_status||[]).map(s=>'<tr><td>'+esc(collectionNames[s.name]||s.name)+'</td><td>'+esc(s.last_attempt?.started||'기록 없음')+'</td><td>'+esc(collectionLabels[s.last_attempt?.status]||'기록 없음')+'</td><td>'+esc(s.last_attempt?.finished||'–')+'</td><td>'+esc(s.last_success||'기록 없음')+'</td></tr>').join('')+'</tbody>';}
 renderCollections();
