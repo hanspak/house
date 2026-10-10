@@ -219,7 +219,8 @@ def build():
     data['collection_status'] = summary(ROOT)
     template = (ROOT / 'scripts/overview_template.html').read_text(encoding='utf-8')
     comparison = (ROOT / 'scripts/overview_comparison.js').read_text(encoding='utf-8')
-    html = template.replace('/*COMPARISON*/', comparison).replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
+    run_status = (ROOT / 'scripts/run_status.js').read_text(encoding='utf-8')
+    html = template.replace('/*COMPARISON*/', comparison).replace('/*RUN_STATUS*/', run_status).replace('/*DATA*/', json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/'))
     html = html.replace('/*BUILD_SHA*/', os.environ.get('GITHUB_SHA', 'local'))
     out = ROOT / 'dashboard/overview.html'
     out.write_text(html, encoding='utf-8')

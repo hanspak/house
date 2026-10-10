@@ -181,8 +181,9 @@ def render(data):
         tpl = f.read()
     with open(os.path.join(os.path.dirname(__file__), "profile_loader.js"), encoding="utf-8") as f:
         loader = f.read()
-    with open(os.path.join(os.path.dirname(__file__), "trade_composition.js"), encoding="utf-8") as f:
-        loader += '\n' + f.read()
+    for name in ("trade_composition.js", "run_status.js"):
+        with open(os.path.join(os.path.dirname(__file__), name), encoding="utf-8") as f:
+            loader += '\n' + f.read()
     html = tpl.replace("/*LOADER*/", loader).replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
     out_dir = os.path.join(ROOT, "dashboard")
     os.makedirs(out_dir, exist_ok=True)

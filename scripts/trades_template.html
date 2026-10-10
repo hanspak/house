@@ -139,6 +139,7 @@ tbody tr{cursor:pointer} tbody tr:hover{background:var(--chip)} tr.on td{font-we
 <header>
   <div>
     <div class="eyebrow">국토교통부 실거래가 · 한국부동산원 R-ONE · 한국은행 ECOS · 수집 <span id="collected"></span></div>
+    <p class="sub" id="run-status" role="status" aria-live="polite">지금 수집 상태 확인 중…</p>
     <h1><span id="h-name"></span> 실거래·거래량·금리</h1>
     <p class="lede">KB 지수가 아닌 실제 신고된 거래로 본 화면입니다. 전국 시·도의 아파트·연립다세대·오피스텔 매매 실거래(최근 24개월), 한국부동산원 아파트 거래량(2006~)과 미분양(2000~), 한국은행 금리를 보여줍니다. 위에서 시·도, 시·군·구와 주택 유형을 바꾸면 화면이 함께 바뀝니다.</p>
   </div>
@@ -667,6 +668,7 @@ function header(){
   $("#source-status").innerHTML=`<table><thead><tr><th>자료</th><th>최신 자료 기간</th><th>수집일</th><th>기준</th></tr></thead><tbody>${(D.sources||[]).map(x=>`<tr><td>${x.name}</td><td>${x.period||'–'}</td><td>${x.collected||'기록 없음'}</td><td>${x.basis}</td></tr>`).join('')}</tbody></table>`;
   // 실거래·R-ONE·ECOS 중 가장 최근 수집 시각을 보이고, 실거래가 그보다 오래됐으면 따로 밝힌다.
   const latestCollected=(D.sources||[]).map(x=>x.collected||'').reduce((a,b)=>b>a?b:a,D.collected);
+  RunStatus.load($("#run-status"));
   $("#collected").textContent=latestCollected+(latestCollected>D.collected?` (실거래 ${D.collected})`:'')+(D.failed?` · 미수집·실패 ${D.failed}건(다음 실행 때 재시도)`:"");$("#h-name").textContent=regionLabel(state.gu);
   const a=AG[state.type][state.gu];
   $("#data-status").textContent=a.n.every(v=>!ok(v))?"이 지역의 실거래 수집이 아직 완료되지 않았습니다. 거래량·미분양·금리는 별도 자료로 표시합니다.":a.n.some(v=>!ok(v))?"일부 월의 실거래 수집이 완료되지 않아 해당 통계는 –로 표시합니다. 소액 목록에는 수집된 거래만 표시합니다.":"";
