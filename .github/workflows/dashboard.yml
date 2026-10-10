@@ -201,10 +201,21 @@ jobs:
         run: python -u scripts/collection_runs.py --name unsold --timeout 300 -- python -u scripts/market_extra.py --source unsold
 
       - name: ECOS rates
+        id: rates
         continue-on-error: true
         env:
           ECOS_KEY: ${{ secrets.ECOS_KEY }}
         run: python -u scripts/collection_runs.py --name rates --timeout 300 -- python -u scripts/market_extra.py --source rates
+
+      # ECOS는 몇 분씩 연결이 안 될 때가 있어, 실패하면 2분 뒤 한 번 더 받는다.
+      - name: ECOS rates retry
+        if: steps.rates.outcome == 'failure'
+        continue-on-error: true
+        env:
+          ECOS_KEY: ${{ secrets.ECOS_KEY }}
+        run: |
+          sleep 120
+          python -u scripts/collection_runs.py --name rates --timeout 300 -- python -u scripts/market_extra.py --source rates
 
       - name: 완전한 전국 자료를 게시용 집계로 저장
         if: steps.collect.outcome == 'success'

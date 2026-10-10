@@ -16,6 +16,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from trade_regions import normalize_rone
@@ -46,15 +47,21 @@ def keys():
     return os.environ.get("RONE_KEY") or k.get("rone"), os.environ.get("ECOS_KEY") or k.get("ecos")
 
 
-def get_json(url):
-    for attempt in range(4):
+def get_json(url, timeout=40, waits=(3, 6, 9)):
+    """waits의 간격으로 재시도한다(시도 횟수 = len(waits) + 1)."""
+    for attempt in range(len(waits) + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            return json.loads(urllib.request.urlopen(req, timeout=40).read())
+            return json.loads(urllib.request.urlopen(req, timeout=timeout).read())
         except Exception:
-            if attempt == 3:
+            if attempt == len(waits):
                 raise
-            time.sleep(3 * (attempt + 1))
+            time.sleep(waits[attempt])
+
+
+# ECOS는 GitHub Actions에서 몇 분씩 연결이 안 되는 일이 있어(URLError), 짧게 기다리며 더 오래 재시도한다.
+# 최악 5×25초 + 110초 = 235초로 수집 제한 5분 안에 끝난다.
+ECOS_TIMEOUT, ECOS_WAITS = 25, (5, 15, 30, 60)
 
 
 def rone_rows(key, **q):
@@ -169,7 +176,7 @@ def ecos_rates(key, start="201001", previous=None):
     series = {}
     for stat, item, name in ECOS_SERIES:
         u = f"https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/1000/{stat}/M/{start}/{end}/{item}"
-        d = get_json(u)
+        d = get_json(u, timeout=ECOS_TIMEOUT, waits=ECOS_WAITS)
         rows = d.get("StatisticSearch", {}).get("row", [])
         series[name] = {r["TIME"]: float(r["DATA_VALUE"]) for r in rows}
     months = sorted({m for s in series.values() for m in s})
@@ -254,7 +261,9 @@ def main(source=None):
             print(f'{key}: {data["months"][0]} ~ {data["months"][-1]}', flush=True)
         except Exception as error:
             failures += 1
-            print(f'{key}: failed ({type(error).__name__}); previous data retained', flush=True)
+            # URLError의 reason은 소켓 오류 설명뿐이라 주소(API 키)가 들어가지 않는다. 다른 오류는 내용을 남기지 않는다.
+            reason = f': {error.reason}' if isinstance(error, urllib.error.URLError) and not isinstance(error, urllib.error.HTTPError) else ''
+            print(f'{key}: failed ({type(error).__name__}{reason}); previous data retained', flush=True)
     write(Path(ROOT) / 'cache/extra.json', load_extra(ROOT))
     return 1 if failures else 0
 
