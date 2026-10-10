@@ -73,25 +73,53 @@ def rone_rows(key, **q):
         page += 1
 
 
-def rone_apt_trades(key, start="200601"):
+# 이전 자료가 있으면 최근 이 개월 수만 다시 받아 덮어쓴다(R-ONE의 과거 값 정정 반영).
+# 전체 기간을 매번 받으면 요청이 수십~수백 번이라 GitHub Actions(해외)에서 5분 제한을 넘긴다.
+RONE_REFRESH_MONTHS = 24
+
+
+def refresh_start(previous, default):
+    """이전 자료의 마지막 달에서 RONE_REFRESH_MONTHS개월 전(YYYYMM). 이전 자료가 없으면 default(전체 기간)."""
+    if not valid_feed(previous):
+        return default
+    y, m = map(int, previous['months'][-1].split('-'))
+    m -= RONE_REFRESH_MONTHS - 1
+    while m < 1:
+        y, m = y - 1, m + 12
+    return max(default, f"{y:04d}{m:02d}")
+
+
+def merge_feed(previous, fresh):
+    """새로 받은 달은 새 값으로, 그 이전 달은 이전 자료로 채운다."""
+    if not valid_feed(previous):
+        return fresh
+    months = sorted(set(previous['months']) | set(fresh['months']))
+    old = {n: dict(zip(previous['months'], a)) for n, a in previous['values'].items()}
+    new = {n: dict(zip(fresh['months'], a)) for n, a in fresh['values'].items()}
+    window = set(fresh['months'])
+    values = {n: [(new.get(n, {}) if m in window else old.get(n, {})).get(m) for m in months]
+              for n in list(old) + [n for n in new if n not in old]}
+    return {**fresh, 'months': months, 'values': values}
+
+
+def rone_apt_trades(key, start="200601", previous=None):
     end = dt.date.today().strftime("%Y%m")
-    latest = rone_rows(key, STATBL_ID=RONE_APT_TRADES, DTACYCLE_CD="MM", WRTTIME_IDTFR_ID=_last_month())
-    if not latest:
-        latest = rone_rows(key, STATBL_ID=RONE_APT_TRADES, DTACYCLE_CD="MM", WRTTIME_IDTFR_ID=_last_month(2))
-    regions = {}
-    for r in latest:
-        full = r["CLS_FULLNM"]
-        if r["ITM_ID"] == RONE_COUNT_ITEM:
-            regions[r["CLS_ID"]] = full
-    series = {}
-    for cid, name in regions.items():
-        rows = rone_rows(key, STATBL_ID=RONE_APT_TRADES, DTACYCLE_CD="MM", CLS_ID=cid, START_WRTTIME=start, END_WRTTIME=end)
-        s = {r["WRTTIME_IDTFR_ID"]: r["DTA_VAL"] for r in rows if r["ITM_ID"] == RONE_COUNT_ITEM}
-        series[name] = s
+    start = refresh_start(previous, start)
+    # 지역별로 따로 요청하지 않고(약 290회) 전 지역을 기간으로 한 번에 받는다.
+    rows = rone_rows(key, STATBL_ID=RONE_APT_TRADES, DTACYCLE_CD="MM", START_WRTTIME=start, END_WRTTIME=end)
+    counts = [r for r in rows if r["ITM_ID"] == RONE_COUNT_ITEM]
+    # 지역 이름은 가장 최근 달의 이름을 쓴다. 과거 행은 이름이 비어 있을 수 있고, 최근 달에 없는 폐지 지역은 뺀다.
+    latest = max((r["WRTTIME_IDTFR_ID"] for r in counts), default=None)
+    regions = {r["CLS_ID"]: r["CLS_FULLNM"] for r in counts if r["WRTTIME_IDTFR_ID"] == latest and r["CLS_FULLNM"]}
+    series = {name: {} for name in regions.values()}
+    for r in counts:
+        if r["CLS_ID"] in regions:
+            series[regions[r["CLS_ID"]]][r["WRTTIME_IDTFR_ID"]] = r["DTA_VAL"]
     months = sorted({m for s in series.values() for m in s})
-    return normalize_rone({"months": [f"{m[:4]}-{m[4:]}" for m in months],
+    fresh = normalize_rone({"months": [f"{m[:4]}-{m[4:]}" for m in months],
             "values": {n: [s.get(m) for m in months] for n, s in series.items()},
             "source": "한국부동산원 R-ONE (월) 행정구역별 아파트매매거래현황"})
+    return merge_feed(previous, fresh)
 
 
 def _last_month(back=1):
@@ -105,8 +133,10 @@ PROV17 = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", 
           "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"]
 
 
-def rone_unsold(key, start="200012"):
+def rone_unsold(key, start="200012", previous=None):
     end = dt.date.today().strftime("%Y%m")
+    whole_range = not valid_feed(previous)
+    start = refresh_start(previous, start)
     rows = rone_rows(key, STATBL_ID=RONE_UNSOLD, DTACYCLE_CD="MM", START_WRTTIME=start, END_WRTTIME=end)
     prov = {p: {} for p in PROV17}
     for r in rows:
@@ -117,8 +147,9 @@ def rone_unsold(key, start="200012"):
     months = sorted({m for s in prov.values() for m in s})
     vals = {p: [s.get(m) for m in months] for p, s in prov.items()}
     # 세종(2012년 출범)처럼 자료가 시작되기 전 달은 0으로 본다. 그 뒤의 빈 달은 그대로 비워 둔다.
+    # 최근 기간만 받을 때는 앞쪽 빈 달이 '출범 전'이 아니므로 채우지 않는다.
     for p, a in vals.items():
-        first = next((i for i, v in enumerate(a) if v is not None), len(a))
+        first = next((i for i, v in enumerate(a) if v is not None), len(a)) if whole_range else 0
         for i in range(first):
             a[i] = 0
 
@@ -128,11 +159,12 @@ def rone_unsold(key, start="200012"):
                 for i in range(len(months))]
     agg = {"전국": total(PROV17), "수도권": total([p for p in PROV17 if p in CAPITAL]),
            "지방": total([p for p in PROV17 if p not in CAPITAL])}
-    return {"months": [f"{m[:4]}-{m[4:]}" for m in months], "values": {**agg, **vals},
-            "source": "한국부동산원 R-ONE 미분양주택현황 (시·도 '계'를 더한 값, 단위 호. 17개 시·도가 모두 발표된 달만 전국 합계)"}
+    return merge_feed(previous, {"months": [f"{m[:4]}-{m[4:]}" for m in months], "values": {**agg, **vals},
+            "source": "한국부동산원 R-ONE 미분양주택현황 (시·도 '계'를 더한 값, 단위 호. 17개 시·도가 모두 발표된 달만 전국 합계)"})
 
 
-def ecos_rates(key, start="201001"):
+def ecos_rates(key, start="201001", previous=None):
+    # ECOS는 통계당 요청 1번이라 빠르므로 항상 전체 기간을 받는다.
     end = dt.date.today().strftime("%Y%m")
     series = {}
     for stat, item, name in ECOS_SERIES:
@@ -196,13 +228,15 @@ def load_extra(root=ROOT):
 def main(source=None):
     rone, ecos = keys()
     failures = 0
+    baseline = load_extra(ROOT)
     for key, fetcher, auth in [('apt_trades', rone_apt_trades, rone), ('unsold', rone_unsold, rone), ('rates', ecos_rates, ecos)]:
         if source and source != key:
             continue
         try:
             if not auth:
                 raise ValueError('missing_key')
-            data = fetcher(auth)
+            previous = {k: v for k, v in baseline.get(key, {}).items() if k != 'collected'} or None
+            data = fetcher(auth, previous=previous)
             if not valid_feed(data):
                 raise ValueError('invalid_series')
             data['collected'] = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime('%Y-%m-%d %H:%M KST')
